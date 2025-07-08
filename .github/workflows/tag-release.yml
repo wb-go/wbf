@@ -1,0 +1,34 @@
+name: Auto Tag Release
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          git fetch --tags
+          echo "::set-output name=tag::$(git tag --sort=-creatordate | head -n1)"
+      - name: Get latest commit on master
+        id: get_commit
+        run: |
+          echo "::set-output name=commit::$(git rev-parse origin/master)"
+      - name: Check if new commits since last tag
+        id: check_new
+        run: |
+          LATEST_TAG=${{ steps.get_tag.outputs.tag }}
+          if [ -z "$LATEST_TAG" ]; then echo "::set-output name=new_commits::true"; exit 0; fi
+          git rev-list $LATEST_TAG..origin/master --count | grep -qv '^0$' && echo "::set-output name=new_commits::true" || echo "::set-output name=new_commits::false"
+      - name: Create new tag if needed
+        if: steps.check_new.outputs.new_commits == 'true'
+        run: |
+          DATE=$(date +'%Y.%m.%d')
+          git tag $DATE
+          git push origin $DATE 

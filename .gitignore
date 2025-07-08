@@ -1,0 +1,44 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.cov
+
+# Dependency directories (remove the comment below if you use Go modules)
+/vendor/
+
+# Go workspace file
+go.work
+
+# Go build cache
+*.a
+
+# IDE/editor configs
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Logs
+*.log
+
+# Test results
+*.coverprofile
+*.testresult
+
+# Pre-commit
+.pre-commit/
+
+# Env files
+.env
+.env.*
+
+# Local config
+config.local.yaml 
