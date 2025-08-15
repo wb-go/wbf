@@ -3,7 +3,7 @@ package redis
 import (
 	"context"
 
-	"wbf/retry"
+	"github.com/wb-go/wbf/retry"
 
 	"github.com/go-redis/redis/v8"
 )
