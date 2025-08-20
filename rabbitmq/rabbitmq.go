@@ -23,8 +23,8 @@ type queueConfig struct {
 }
 
 type publisher struct {
-	channel *amqp091.Channel
-	queue   string
+	channel    *amqp091.Channel
+	routingKey string
 }
 
 type publishingOptions struct {
@@ -47,10 +47,36 @@ type consumer struct {
 	config  *consumerConfig
 }
 
+type exchange struct {
+	name       string        // Название обменника
+	kind       string        // Тип обменника: direct, fanout, topic, headers
+	Durable    bool          // Усли true, то обменник сохранится при перезагрузке сервера
+	AutoDelete bool          // Если true, то обменник удалится когда все очереди отвяжутся
+	Internal   bool          // Усли true, то обменник нельзя использовать для публикации напрямую
+	NoWait     bool          // Если true, то не ждем подтверждения от сервера
+	Args       amqp091.Table // Доп аргументы
+}
+
+/*
+NewExchange создате новый экземпляр Exchange
+
+name - название обменника,
+
+kind - тип обменника: direct, fanout, topic, headers
+*/
+func NewExhcange(name, kind string) *exchange {
+	return &exchange{
+		name: name,
+		kind: kind,
+	}
+}
+
 /*
 NewConsumer создает новый экземпляр Consumer.
 
-ch - канал AMQP, config - конфигурация потребителя.
+ch - канал AMQP,
+
+config - конфигурация потребителя.
 */
 func NewConsumer(ch *amqp091.Channel, config *consumerConfig) *consumer {
 	return &consumer{
@@ -75,17 +101,17 @@ func NewPublishingOptions() *publishingOptions {
 	return &publishingOptions{}
 }
 
-/* 
+/*
 NewPublisher создает новый экземпляр Publisher.
 
-ch - канал AMQP, 
+ch - канал AMQP,
 
-queue - очередь для публикации.
+routingKey - "адрес" для доставки сообщений.
 */
-func NewPublisher(ch *amqp091.Channel, queue string) *publisher {
+func NewPublisher(ch *amqp091.Channel, routingKey string) *publisher {
 	return &publisher{
-		channel: ch, 
-		queue:   queue,
+		channel:    ch,
+		routingKey: routingKey,
 	}
 }
 
@@ -131,6 +157,23 @@ func Connect(url string, retries int, pause time.Duration) (*amqp091.Connection,
 }
 
 /*
+BindToChannel создает обменник.
+
+ch - канал AMQP.
+*/
+func (e *exchange) BindToChannel(ch *amqp091.Channel) error {
+	return ch.ExchangeDeclare(
+		e.name,
+		e.kind,
+		e.Durable,
+		e.AutoDelete,
+		e.Internal,
+		e.NoWait,
+		e.Args,
+	)
+}
+
+/*
 DeclareQueue объявляет очередь с указанным именем и параметрами.
 
 name - имя очереди,
@@ -139,7 +182,7 @@ config - необязательные параметры конфигураци�
 */
 func (qm *queueManager) DeclareQueue(name string, config ...queueConfig) (amqp091.Queue, error) {
 	cfg := NewQueueConfig()
-	
+
 	if len(config) > 0 {
 		cfg = &config[0]
 	}
@@ -154,12 +197,12 @@ func (qm *queueManager) DeclareQueue(name string, config ...queueConfig) (amqp09
 	)
 }
 
-/* 
+/*
 Publish публикует сообщение в указанный exchange.
 
-body - тело сообщения, 
+body - тело сообщения,
 
-exchange - точка обмена, 
+exchange - точка обмена,
 
 contentType - тип контента,
 
@@ -174,7 +217,7 @@ func (p *publisher) Publish(body []byte, exchange string, contentType string, op
 
 	return p.channel.Publish(
 		exchange,
-		p.queue,
+		p.routingKey,
 		option.Mandatory,
 		option.Immediate,
 		amqp091.Publishing{
@@ -184,7 +227,7 @@ func (p *publisher) Publish(body []byte, exchange string, contentType string, op
 	)
 }
 
-/* 
+/*
 Consume начинает потребление сообщений и отправляет их в указанный канал.
 
 msgChan - канал для получения сообщений.
@@ -213,6 +256,6 @@ func (c *consumer) Consume(msgChan chan []byte) error {
 
 		msgChan <- msg.Body
 	}
-	
+
 	return nil
 }
