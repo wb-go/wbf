@@ -10,11 +10,11 @@ import (
 	"github.com/rabbitmq/amqp091-go"
 )
 
-type queueManager struct {
+type QueueManager struct {
 	channel *amqp091.Channel
 }
 
-type queueConfig struct {
+type QueueConfig struct {
 	Durable    bool          // Если true, то очередь сохраняется при перезапуске RabbitMQ
 	AutoDelete bool          // Если true, то очередь удаляется при отсутствии подписчиков
 	Exclusive  bool          // Если true, то очередь доступна только одному соединению
@@ -22,17 +22,19 @@ type queueConfig struct {
 	Args       amqp091.Table // Доп аргументы
 }
 
-type publisher struct {
+type Publisher struct {
 	channel    *amqp091.Channel
+	exchange   string
 	routingKey string
 }
 
-type publishingOptions struct {
-	Mandatory bool // Если true, то сообщение будет возвращено при отсутствии очереди
-	Immediate bool // Если true, то сообщение будет возвращено при отсутствии потребителя
+type PublishingOptions struct {
+	Mandatory  bool          // Если true, то сообщение будет возвращено при отсутствии очереди
+	Immediate  bool          // Если true, то сообщение будет возвращено при отсутствии потребителя
+	Expiration time.Duration // TTL сообщения
 }
 
-type consumerConfig struct {
+type ConsumerConfig struct {
 	Queue     string        // Имя очереди
 	Consumer  string        // Идентификатор потребителя
 	AutoAck   bool          // Автоматическое подтверждение сообщений
@@ -42,12 +44,12 @@ type consumerConfig struct {
 	Args      amqp091.Table // Доп аргументы
 }
 
-type consumer struct {
+type Consumer struct {
 	channel *amqp091.Channel
-	config  *consumerConfig
+	config  *ConsumerConfig
 }
 
-type exchange struct {
+type Exchange struct {
 	name       string        // Название обменника
 	kind       string        // Тип обменника: direct, fanout, topic, headers
 	Durable    bool          // Усли true, то обменник сохранится при перезагрузке сервера
@@ -64,8 +66,8 @@ name - название обменника,
 
 kind - тип обменника: direct, fanout, topic, headers
 */
-func NewExhcange(name, kind string) *exchange {
-	return &exchange{
+func NewExchange(name, kind string) *Exchange {
+	return &Exchange{
 		name: name,
 		kind: kind,
 	}
@@ -78,8 +80,8 @@ ch - канал AMQP,
 
 config - конфигурация потребителя.
 */
-func NewConsumer(ch *amqp091.Channel, config *consumerConfig) *consumer {
-	return &consumer{
+func NewConsumer(ch *amqp091.Channel, config *ConsumerConfig) *Consumer {
+	return &Consumer{
 		channel: ch,
 		config:  config,
 	}
@@ -90,15 +92,10 @@ NewConsumerConfig создает конфигурацию потребителя
 
 queue - имя очереди для подписки.
 */
-func NewConsumerConfig(queue string) *consumerConfig {
-	return &consumerConfig{
+func NewConsumerConfig(queue string) *ConsumerConfig {
+	return &ConsumerConfig{
 		Queue: queue,
 	}
-}
-
-// NewPublishingOptions создает опции публикации с настройками по умолчанию.
-func NewPublishingOptions() *publishingOptions {
-	return &publishingOptions{}
 }
 
 /*
@@ -108,16 +105,12 @@ ch - канал AMQP,
 
 routingKey - "адрес" для доставки сообщений.
 */
-func NewPublisher(ch *amqp091.Channel, routingKey string) *publisher {
-	return &publisher{
+func NewPublisher(ch *amqp091.Channel, exhange, routingKey string) *Publisher {
+	return &Publisher{
 		channel:    ch,
+		exchange:   exhange,
 		routingKey: routingKey,
 	}
-}
-
-// NewQueueConfig создает конфигурацию очереди с настройками по умолчанию.
-func NewQueueConfig() *queueConfig {
-	return &queueConfig{}
 }
 
 /*
@@ -125,8 +118,8 @@ NewQueueManager создает новый экземпляр QueueManager.
 
 channel - канал AMQP для управления очередями.
 */
-func NewQueueManager(channel *amqp091.Channel) *queueManager {
-	return &queueManager{
+func NewQueueManager(channel *amqp091.Channel) *QueueManager {
+	return &QueueManager{
 		channel: channel,
 	}
 }
@@ -161,7 +154,7 @@ BindToChannel создает обменник.
 
 ch - канал AMQP.
 */
-func (e *exchange) BindToChannel(ch *amqp091.Channel) error {
+func (e *Exchange) BindToChannel(ch *amqp091.Channel) error {
 	return ch.ExchangeDeclare(
 		e.name,
 		e.kind,
@@ -180,8 +173,8 @@ name - имя очереди,
 
 config - необязательные параметры конфигурации.
 */
-func (qm *queueManager) DeclareQueue(name string, config ...queueConfig) (amqp091.Queue, error) {
-	cfg := NewQueueConfig()
+func (qm *QueueManager) DeclareQueue(name string, config ...QueueConfig) (amqp091.Queue, error) {
+	cfg := &QueueConfig{}
 
 	if len(config) > 0 {
 		cfg = &config[0]
@@ -198,7 +191,7 @@ func (qm *queueManager) DeclareQueue(name string, config ...queueConfig) (amqp09
 }
 
 /*
-Publish публикует сообщение в указанный exchange.
+Publish публикует сообщение с заданным routingKey в exchange, связанный с Publisher.
 
 body - тело сообщения,
 
@@ -208,22 +201,28 @@ contentType - тип контента,
 
 options - необязательные параметры публикации.
 */
-func (p *publisher) Publish(body []byte, exchange string, contentType string, options ...publishingOptions) error {
-	var option publishingOptions
+func (p *Publisher) Publish(body []byte, contentType string, options ...PublishingOptions) error {
+	var option PublishingOptions
 
 	if len(options) > 0 {
 		option = options[0]
 	}
 
+	pub := amqp091.Publishing{
+		ContentType: contentType,
+		Body:        body,
+	}
+
+	if option.Expiration > 0 {
+		pub.Expiration = fmt.Sprintf("%d", option.Expiration.Milliseconds())
+	}
+
 	return p.channel.Publish(
-		exchange,
+		p.exchange,
 		p.routingKey,
 		option.Mandatory,
 		option.Immediate,
-		amqp091.Publishing{
-			ContentType: contentType,
-			Body:        body,
-		},
+		pub,
 	)
 }
 
@@ -232,7 +231,7 @@ Consume начинает потребление сообщений и отпра
 
 msgChan - канал для получения сообщений.
 */
-func (c *consumer) Consume(msgChan chan []byte) error {
+func (c *Consumer) Consume(msgChan chan []byte) error {
 	msgs, err := c.channel.Consume(
 		c.config.Queue,
 		c.config.Consumer,
@@ -250,7 +249,10 @@ func (c *consumer) Consume(msgChan chan []byte) error {
 		if !c.config.AutoAck {
 			if err := msg.Ack(false); err != nil {
 				log.Printf("Failed to ack message: %v", err)
-				msg.Nack(false, true)
+
+				if err = msg.Nack(false, true); err != nil {
+					log.Printf("Failed to nack message: %v", err)
+				}
 			}
 		}
 
