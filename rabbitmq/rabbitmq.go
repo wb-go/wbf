@@ -10,8 +10,12 @@ import (
 	"github.com/rabbitmq/amqp091-go"
 )
 
+type Connection = amqp091.Connection
+type Channel = amqp091.Channel
+type Queue = amqp091.Queue
+
 type QueueManager struct {
-	channel *amqp091.Channel
+	channel *Channel
 }
 
 type QueueConfig struct {
@@ -23,7 +27,7 @@ type QueueConfig struct {
 }
 
 type Publisher struct {
-	channel    *amqp091.Channel
+	channel    *Channel
 	exchange   string
 	routingKey string
 }
@@ -45,7 +49,7 @@ type ConsumerConfig struct {
 }
 
 type Consumer struct {
-	channel *amqp091.Channel
+	channel *Channel
 	config  *ConsumerConfig
 }
 
@@ -57,6 +61,16 @@ type Exchange struct {
 	Internal   bool          // Усли true, то обменник нельзя использовать для публикации напрямую
 	NoWait     bool          // Если true, то не ждем подтверждения от сервера
 	Args       amqp091.Table // Доп аргументы
+}
+
+// Name возвращает название обменника
+func (e *Exchange) Name() string {
+	return e.name
+}
+
+// Kind возвращает тип обменника
+func (e *Exchange) Kind() string {
+	return e.name
 }
 
 /*
@@ -80,7 +94,7 @@ ch - канал AMQP,
 
 config - конфигурация потребителя.
 */
-func NewConsumer(ch *amqp091.Channel, config *ConsumerConfig) *Consumer {
+func NewConsumer(ch *Channel, config *ConsumerConfig) *Consumer {
 	return &Consumer{
 		channel: ch,
 		config:  config,
@@ -105,7 +119,7 @@ ch - канал AMQP,
 
 routingKey - "адрес" для доставки сообщений.
 */
-func NewPublisher(ch *amqp091.Channel, exhange, routingKey string) *Publisher {
+func NewPublisher(ch *Channel, exhange, routingKey string) *Publisher {
 	return &Publisher{
 		channel:    ch,
 		exchange:   exhange,
@@ -118,7 +132,7 @@ NewQueueManager создает новый экземпляр QueueManager.
 
 channel - канал AMQP для управления очередями.
 */
-func NewQueueManager(channel *amqp091.Channel) *QueueManager {
+func NewQueueManager(channel *Channel) *QueueManager {
 	return &QueueManager{
 		channel: channel,
 	}
@@ -133,7 +147,7 @@ retries - количество попыток,
 
 pause - задержка между попытками.
 */
-func Connect(url string, retries int, pause time.Duration) (*amqp091.Connection, error) {
+func Connect(url string, retries int, pause time.Duration) (*Connection, error) {
 	var conn *amqp091.Connection
 	var err error
 
@@ -154,7 +168,7 @@ BindToChannel создает обменник.
 
 ch - канал AMQP.
 */
-func (e *Exchange) BindToChannel(ch *amqp091.Channel) error {
+func (e *Exchange) BindToChannel(ch *Channel) error {
 	return ch.ExchangeDeclare(
 		e.name,
 		e.kind,
@@ -173,7 +187,7 @@ name - имя очереди,
 
 config - необязательные параметры конфигурации.
 */
-func (qm *QueueManager) DeclareQueue(name string, config ...QueueConfig) (amqp091.Queue, error) {
+func (qm *QueueManager) DeclareQueue(name string, config ...QueueConfig) (Queue, error) {
 	cfg := &QueueConfig{}
 
 	if len(config) > 0 {
