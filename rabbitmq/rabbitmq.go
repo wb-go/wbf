@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/wb-go/wbf/retry"
 )
 
 type Connection = amqp091.Connection
@@ -239,6 +240,23 @@ func (p *Publisher) Publish(body []byte, routingKey, contentType string, options
 }
 
 /*
+PublishWithRetry пытается опубликовать сообщение с заданным routingKey в exchange, связанный с Publisher с ретраями в случае ошибки.
+
+body - тело сообщения,
+
+exchange - точка обмена,
+
+contentType - тип контента,
+
+options - необязательные параметры публикации.
+*/
+func (p *Publisher) PublishWithRetry(body []byte, routingKey, contentType string, strategy retry.Strategy, options ...PublishingOptions) error {
+	return retry.Do(func() error {
+		return p.Publish(body, routingKey, contentType, options...)
+	}, strategy)
+}
+
+/*
 Consume начинает потребление сообщений и отправляет их в указанный канал.
 
 msgChan - канал для получения сообщений.
@@ -272,4 +290,15 @@ func (c *Consumer) Consume(msgChan chan []byte) error {
 	}
 
 	return nil
+}
+
+/*
+ConsumeWithRetry пытается начать потребление сообщений и отправляет их в указанный канал с ретраями в случае ошибки.
+
+msgChan - канал для получения сообщений.
+*/
+func (c *Consumer) ConsumeWithRetry(msgChan chan []byte, strategy retry.Strategy) error {
+	return retry.Do(func() error {
+		return c.Consume(msgChan)
+	}, strategy)
 }
