@@ -27,9 +27,8 @@ type QueueConfig struct {
 }
 
 type Publisher struct {
-	channel    *Channel
-	exchange   string
-	routingKey string
+	channel  *Channel
+	exchange string
 }
 
 type PublishingOptions struct {
@@ -119,11 +118,10 @@ ch - канал AMQP,
 
 routingKey - "адрес" для доставки сообщений.
 */
-func NewPublisher(ch *Channel, exhange, routingKey string) *Publisher {
+func NewPublisher(ch *Channel, exchange string) *Publisher {
 	return &Publisher{
-		channel:    ch,
-		exchange:   exhange,
-		routingKey: routingKey,
+		channel:  ch,
+		exchange: exchange,
 	}
 }
 
@@ -215,7 +213,7 @@ contentType - тип контента,
 
 options - необязательные параметры публикации.
 */
-func (p *Publisher) Publish(body []byte, contentType string, options ...PublishingOptions) error {
+func (p *Publisher) Publish(body []byte, routingKey, contentType string, options ...PublishingOptions) error {
 	var option PublishingOptions
 
 	if len(options) > 0 {
@@ -233,7 +231,7 @@ func (p *Publisher) Publish(body []byte, contentType string, options ...Publishi
 
 	return p.channel.Publish(
 		p.exchange,
-		p.routingKey,
+		routingKey,
 		option.Mandatory,
 		option.Immediate,
 		pub,
