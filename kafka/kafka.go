@@ -3,7 +3,7 @@ package kafka
 import (
 	"context"
 
-	"wbf/retry"
+	"github.com/pozedorum/wbf/retry"
 
 	"github.com/segmentio/kafka-go"
 )
