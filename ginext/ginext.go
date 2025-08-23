@@ -40,6 +40,15 @@ func (e *Engine) Use(middleware ...HandlerFunc) {
 	e.Engine.Use(middleware...)
 }
 
+// Стандартные middleware
+func Logger() HandlerFunc {
+	return gin.Logger()
+}
+
+func Recovery() HandlerFunc {
+	return gin.Recovery()
+}
+
 // HTTP-методы для Engine
 
 func (e *Engine) GET(relativePath string, handlers ...HandlerFunc) {

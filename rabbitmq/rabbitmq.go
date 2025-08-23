@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/pozedorum/wbf/retry"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -15,7 +16,7 @@ type Channel = amqp091.Channel
 type Queue = amqp091.Queue
 
 type QueueManager struct {
-	channel *amqp091.Channel
+	channel *Channel
 }
 
 type QueueConfig struct {
@@ -27,9 +28,8 @@ type QueueConfig struct {
 }
 
 type Publisher struct {
-	channel    *amqp091.Channel
-	exchange   string
-	routingKey string
+	channel  *Channel
+	exchange string
 }
 
 type PublishingOptions struct {
@@ -49,7 +49,7 @@ type ConsumerConfig struct {
 }
 
 type Consumer struct {
-	channel *amqp091.Channel
+	channel *Channel
 	config  *ConsumerConfig
 }
 
@@ -61,6 +61,16 @@ type Exchange struct {
 	Internal   bool          // Усли true, то обменник нельзя использовать для публикации напрямую
 	NoWait     bool          // Если true, то не ждем подтверждения от сервера
 	Args       amqp091.Table // Доп аргументы
+}
+
+// Name возвращает название обменника
+func (e *Exchange) Name() string {
+	return e.name
+}
+
+// Kind возвращает тип обменника
+func (e *Exchange) Kind() string {
+	return e.name
 }
 
 /*
@@ -84,7 +94,7 @@ ch - канал AMQP,
 
 config - конфигурация потребителя.
 */
-func NewConsumer(ch *amqp091.Channel, config *ConsumerConfig) *Consumer {
+func NewConsumer(ch *Channel, config *ConsumerConfig) *Consumer {
 	return &Consumer{
 		channel: ch,
 		config:  config,
@@ -109,11 +119,10 @@ ch - канал AMQP,
 
 routingKey - "адрес" для доставки сообщений.
 */
-func NewPublisher(ch *amqp091.Channel, exhange, routingKey string) *Publisher {
+func NewPublisher(ch *Channel, exchange string) *Publisher {
 	return &Publisher{
-		channel:    ch,
-		exchange:   exhange,
-		routingKey: routingKey,
+		channel:  ch,
+		exchange: exchange,
 	}
 }
 
@@ -122,7 +131,7 @@ NewQueueManager создает новый экземпляр QueueManager.
 
 channel - канал AMQP для управления очередями.
 */
-func NewQueueManager(channel *amqp091.Channel) *QueueManager {
+func NewQueueManager(channel *Channel) *QueueManager {
 	return &QueueManager{
 		channel: channel,
 	}
@@ -137,7 +146,7 @@ retries - количество попыток,
 
 pause - задержка между попытками.
 */
-func Connect(url string, retries int, pause time.Duration) (*amqp091.Connection, error) {
+func Connect(url string, retries int, pause time.Duration) (*Connection, error) {
 	var conn *amqp091.Connection
 	var err error
 
@@ -158,7 +167,7 @@ BindToChannel создает обменник.
 
 ch - канал AMQP.
 */
-func (e *Exchange) BindToChannel(ch *amqp091.Channel) error {
+func (e *Exchange) BindToChannel(ch *Channel) error {
 	return ch.ExchangeDeclare(
 		e.name,
 		e.kind,
@@ -177,7 +186,7 @@ name - имя очереди,
 
 config - необязательные параметры конфигурации.
 */
-func (qm *QueueManager) DeclareQueue(name string, config ...QueueConfig) (amqp091.Queue, error) {
+func (qm *QueueManager) DeclareQueue(name string, config ...QueueConfig) (Queue, error) {
 	cfg := &QueueConfig{}
 
 	if len(config) > 0 {
@@ -205,7 +214,7 @@ contentType - тип контента,
 
 options - необязательные параметры публикации.
 */
-func (p *Publisher) Publish(body []byte, contentType string, options ...PublishingOptions) error {
+func (p *Publisher) Publish(body []byte, routingKey, contentType string, options ...PublishingOptions) error {
 	var option PublishingOptions
 
 	if len(options) > 0 {
@@ -223,11 +232,28 @@ func (p *Publisher) Publish(body []byte, contentType string, options ...Publishi
 
 	return p.channel.Publish(
 		p.exchange,
-		p.routingKey,
+		routingKey,
 		option.Mandatory,
 		option.Immediate,
 		pub,
 	)
+}
+
+/*
+PublishWithRetry пытается опубликовать сообщение с заданным routingKey в exchange, связанный с Publisher с ретраями в случае ошибки.
+
+body - тело сообщения,
+
+exchange - точка обмена,
+
+contentType - тип контента,
+
+options - необязательные параметры публикации.
+*/
+func (p *Publisher) PublishWithRetry(body []byte, routingKey, contentType string, strategy retry.Strategy, options ...PublishingOptions) error {
+	return retry.Do(func() error {
+		return p.Publish(body, routingKey, contentType, options...)
+	}, strategy)
 }
 
 /*
@@ -264,4 +290,15 @@ func (c *Consumer) Consume(msgChan chan []byte) error {
 	}
 
 	return nil
+}
+
+/*
+ConsumeWithRetry пытается начать потребление сообщений и отправляет их в указанный канал с ретраями в случае ошибки.
+
+msgChan - канал для получения сообщений.
+*/
+func (c *Consumer) ConsumeWithRetry(msgChan chan []byte, strategy retry.Strategy) error {
+	return retry.Do(func() error {
+		return c.Consume(msgChan)
+	}, strategy)
 }
