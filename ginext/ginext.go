@@ -41,7 +41,7 @@ func (e *Engine) Use(middleware ...HandlerFunc) {
 }
 
 func (g *RouterGroup) LoadHTMLGlob(pathToHTML string) {
-	g.LoadHTMLGlob(pathToHTML)
+	gin.Default().LoadHTMLGlob(pathToHTML)
 }
 
 // Стандартные middleware
