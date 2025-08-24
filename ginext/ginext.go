@@ -40,6 +40,10 @@ func (e *Engine) Use(middleware ...HandlerFunc) {
 	e.Engine.Use(middleware...)
 }
 
+func (g *RouterGroup) LoadHTMLGlob(pathToHTML string) {
+	g.LoadHTMLGlob(pathToHTML)
+}
+
 // Стандартные middleware
 func Logger() HandlerFunc {
 	return gin.Logger()
