@@ -3,10 +3,12 @@ package redis
 import (
 	"context"
 
-	"wbf/retry"
-
 	"github.com/go-redis/redis/v8"
+	"github.com/wb-go/wbf/retry"
 )
+
+// NoMatches is used for when Redis did not get any matches.
+const NoMatches = redis.Nil
 
 type Client struct {
 	*redis.Client
