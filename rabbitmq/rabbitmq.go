@@ -36,6 +36,7 @@ type PublishingOptions struct {
 	Mandatory  bool          // Если true, то сообщение будет возвращено при отсутствии очереди
 	Immediate  bool          // Если true, то сообщение будет возвращено при отсутствии потребителя
 	Expiration time.Duration // TTL сообщения
+	Headers    amqp091.Table // Заголовки
 }
 
 type ConsumerConfig struct {
@@ -222,6 +223,7 @@ func (p *Publisher) Publish(body []byte, routingKey, contentType string, options
 	}
 
 	pub := amqp091.Publishing{
+		Headers:     option.Headers,
 		ContentType: contentType,
 		Body:        body,
 	}
