@@ -1,7 +1,8 @@
+// Package ginext предоставляет расширения для веб-фреймворка Gin.
 package ginext
 
 import (
-	"github.com/gin-gonic/gin"
+  "github.com/gin-gonic/gin"
 )
 
 // Аналоги библиотечных типов
@@ -9,48 +10,51 @@ type Context = gin.Context
 type HandlerFunc = gin.HandlerFunc
 type H = gin.H
 
-// Engine основная структура gin
+// Engine расширяет стандартный Gin Engine.
 type Engine struct {
-	*gin.Engine
+  *gin.Engine
 }
 
 // RouterGroup позволяет объединять хэндлеры в группы
 type RouterGroup struct {
-	*gin.RouterGroup
+  *gin.RouterGroup
 }
 
-// New - конструктор роутера
+// New создает новый экземпляр Engine.
 func New() *Engine {
-	return &Engine{gin.New()}
+  return &Engine{gin.New()}
 }
 
-// Запуск сервера
+// Run запуск сервера
 func (e *Engine) Run(addr ...string) error {
-	return e.Engine.Run(addr...)
+  return e.Engine.Run(addr...)
 }
 
 // Group используется для создания группы роутов
 func (e *Engine) Group(relativePath string, handlers ...HandlerFunc) *RouterGroup {
-
-	return &RouterGroup{e.Engine.Group(relativePath, handlers...)}
+  return &RouterGroup{e.Engine.Group(relativePath, handlers...)}
 }
 
-// Use используется для установки middleware на хэндлер/хэндлеры
+// Use используется для установки middleware
 func (e *Engine) Use(middleware ...HandlerFunc) {
-	e.Engine.Use(middleware...)
+  e.Engine.Use(middleware...)
+}
+
+func (g *RouterGroup) Use(middleware ...HandlerFunc) {
+	g.RouterGroup.Use(middleware...)
 }
 
 func (e *Engine) LoadHTMLGlob(pattern string) {
-	e.Engine.LoadHTMLGlob(pattern)
+  e.Engine.LoadHTMLGlob(pattern)
 }
 
 // Стандартные middleware
 func Logger() HandlerFunc {
-	return gin.Logger()
+  return gin.Logger()
 }
 
 func Recovery() HandlerFunc {
-	return gin.Recovery()
+  return gin.Recovery()
 }
 
 // HTTP-методы для Engine
@@ -111,8 +115,4 @@ func (g *RouterGroup) OPTIONS(relativePath string, handlers ...HandlerFunc) {
 
 func (g *RouterGroup) HEAD(relativePath string, handlers ...HandlerFunc) {
 	g.RouterGroup.HEAD(relativePath, handlers...)
-}
-
-func (g *RouterGroup) Use(middleware ...HandlerFunc) {
-	g.RouterGroup.Use(middleware...)
 }
