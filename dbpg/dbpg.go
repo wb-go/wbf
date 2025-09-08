@@ -64,7 +64,7 @@ func New(masterDSN string, slaveDSNs []string, opts *Options) (*DB, error) {
 
 // QueryContext выполняет запрос на slave если доступен, иначе на master.
 func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	return db.Master.QueryContext(ctx, query, args...)
+	return db.selectDB().QueryContext(ctx, query, args...)
 }
 
 // QueryRowContext выполняет запрос на slave если доступен, иначе на master.
