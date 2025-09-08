@@ -64,16 +64,12 @@ func New(masterDSN string, slaveDSNs []string, opts *Options) (*DB, error) {
 
 // QueryContext выполняет запрос на slave если доступен, иначе на master.
 func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	if len(db.Slaves) > 0 {
-		// Выбираем slave по индексу rrIndex и обновляем индекс для следующего запроса.
-		db.rrMutex.Lock()
-		slave := db.Slaves[db.rrIndex]
-		db.rrIndex = (db.rrIndex + 1) % len(db.Slaves) // round-robin по кругу
-		db.rrMutex.Unlock()
-
-		return slave.QueryContext(ctx, query, args...)
-	}
 	return db.Master.QueryContext(ctx, query, args...)
+}
+
+// QueryRowContext выполняет запрос на slave если доступен, иначе на master.
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	return db.selectDB().QueryRowContext(ctx, query, args...)
 }
 
 // ExecContext выполняет команду на master базе данных.
@@ -136,4 +132,19 @@ func (db *DB) BatchExec(ctx context.Context, in <-chan string) {
 			}
 		}
 	}()
+}
+
+// selectDB возвращает базу для выполнения запроса: slave (round-robin) или master.
+func (db *DB) selectDB() *sql.DB {
+	if len(db.Slaves) > 0 {
+		// Выбираем slave по индексу rrIndex и обновляем индекс для следующего запроса.
+		db.rrMutex.Lock()
+		slave := db.Slaves[db.rrIndex]
+		db.rrIndex = (db.rrIndex + 1) % len(db.Slaves) // round-robin по кругу
+		db.rrMutex.Unlock()
+
+		return slave
+	}
+
+	return db.Master
 }
