@@ -6,8 +6,10 @@ import (
 	"database/sql"
 	"time"
 
-	_ "github.com/lib/pq" // Драйвер PostgreSQL.
+
 	"github.com/wb-go/wbf/retry"
+
+	_ "github.com/lib/pq"
 )
 
 // DB представляет подключение к базе данных с master и slave узлами.
