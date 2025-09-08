@@ -4,6 +4,7 @@ package dbpg
 import (
 	"context"
 	"database/sql"
+	"sync"
 	"time"
 
 	_ "github.com/lib/pq" // Драйвер PostgreSQL.
@@ -12,8 +13,10 @@ import (
 
 // DB представляет подключение к базе данных с master и slave узлами.
 type DB struct {
-	Master *sql.DB
-	Slaves []*sql.DB
+	Master  *sql.DB
+	Slaves  []*sql.DB
+	rrIndex int // индекс для round-robin
+	rrMutex sync.Mutex
 }
 
 // Options содержит опции конфигурации подключения к базе данных.
@@ -62,8 +65,13 @@ func New(masterDSN string, slaveDSNs []string, opts *Options) (*DB, error) {
 // QueryContext выполняет запрос на slave если доступен, иначе на master.
 func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
 	if len(db.Slaves) > 0 {
-		// Простейший round-robin.
-		return db.Slaves[0].QueryContext(ctx, query, args...)
+		// Выбираем slave по индексу rrIndex и обновляем индекс для следующего запроса.
+		db.rrMutex.Lock()
+		slave := db.Slaves[db.rrIndex]
+		db.rrIndex = (db.rrIndex + 1) % len(db.Slaves) // round-robin по кругу
+		db.rrMutex.Unlock()
+
+		return slave.QueryContext(ctx, query, args...)
 	}
 	return db.Master.QueryContext(ctx, query, args...)
 }
