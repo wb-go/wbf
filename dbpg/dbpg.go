@@ -4,6 +4,7 @@ package dbpg
 import (
 	"context"
 	"database/sql"
+	"sync"
 	"time"
 
 	_ "github.com/lib/pq" // Драйвер PostgreSQL.
@@ -12,8 +13,10 @@ import (
 
 // DB представляет подключение к базе данных с master и slave узлами.
 type DB struct {
-	Master *sql.DB
-	Slaves []*sql.DB
+	Master  *sql.DB
+	Slaves  []*sql.DB
+	rrIndex int // индекс для round-robin
+	rrMutex sync.Mutex
 }
 
 // Options содержит опции конфигурации подключения к базе данных.
@@ -61,11 +64,12 @@ func New(masterDSN string, slaveDSNs []string, opts *Options) (*DB, error) {
 
 // QueryContext выполняет запрос на slave если доступен, иначе на master.
 func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	if len(db.Slaves) > 0 {
-		// Простейший round-robin.
-		return db.Slaves[0].QueryContext(ctx, query, args...)
-	}
-	return db.Master.QueryContext(ctx, query, args...)
+	return db.selectDB().QueryContext(ctx, query, args...)
+}
+
+// QueryRowContext выполняет запрос на slave если доступен, иначе на master.
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	return db.selectDB().QueryRowContext(ctx, query, args...)
 }
 
 // ExecContext выполняет команду на master базе данных.
@@ -128,4 +132,19 @@ func (db *DB) BatchExec(ctx context.Context, in <-chan string) {
 			}
 		}
 	}()
+}
+
+// selectDB возвращает базу для выполнения запроса: slave (round-robin) или master.
+func (db *DB) selectDB() *sql.DB {
+	if len(db.Slaves) > 0 {
+		// Выбираем slave по индексу rrIndex и обновляем индекс для следующего запроса.
+		db.rrMutex.Lock()
+		slave := db.Slaves[db.rrIndex]
+		db.rrIndex = (db.rrIndex + 1) % len(db.Slaves) // round-robin по кругу
+		db.rrMutex.Unlock()
+
+		return slave
+	}
+
+	return db.Master
 }
