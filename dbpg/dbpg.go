@@ -68,6 +68,15 @@ func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{
 	return db.Master.QueryContext(ctx, query, args...)
 }
 
+// QueryRowContext выполняет запрос на slave если доступен, иначе на master.
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) (*sql.Row) {
+	if len(db.Slaves) > 0 {
+		// Простейший round-robin.
+		return db.Slaves[0].QueryRowContext(ctx, query, args...)
+	}
+	return db.Master.QueryRowContext(ctx, query, args...)
+}
+
 // ExecContext выполняет команду на master базе данных.
 func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
 	return db.Master.ExecContext(ctx, query, args...)
