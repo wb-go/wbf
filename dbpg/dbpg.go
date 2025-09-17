@@ -12,6 +12,8 @@ import (
 
 // DB представляет подключение к базе данных с master и slave узлами.
 type DB struct {
+	balancer *balancer
+
 	Master *sql.DB
 	Slaves []*sql.DB
 }
@@ -56,23 +58,27 @@ func New(masterDSN string, slaveDSNs []string, opts *Options) (*DB, error) {
 		applyOptions(slave, opts)
 		slaves = append(slaves, slave)
 	}
-	return &DB{Master: master, Slaves: slaves}, nil
+
+	// Создаем balancer для использования slaves
+	balancer := newBalancer(len(slaveDSNs))
+
+	return &DB{Master: master, Slaves: slaves, balancer: balancer}, nil
 }
 
 // QueryContext выполняет запрос на slave если доступен, иначе на master.
 func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
 	if len(db.Slaves) > 0 {
 		// Простейший round-robin.
-		return db.Slaves[0].QueryContext(ctx, query, args...)
+		return db.Slaves[db.balancer.index()].QueryContext(ctx, query, args...)
 	}
 	return db.Master.QueryContext(ctx, query, args...)
 }
 
 // QueryRowContext выполняет запрос на slave если доступен, иначе на master.
-func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) (*sql.Row) {
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
 	if len(db.Slaves) > 0 {
 		// Простейший round-robin.
-		return db.Slaves[0].QueryRowContext(ctx, query, args...)
+		return db.Slaves[db.balancer.index()].QueryRowContext(ctx, query, args...)
 	}
 	return db.Master.QueryRowContext(ctx, query, args...)
 }
