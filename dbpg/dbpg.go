@@ -131,6 +131,22 @@ func (db *DB) QueryWithRetry(
 	return rows, err
 }
 
+func (db *DB) QueryRowWithRetry(
+	ctx context.Context,
+	strategy retry.Strategy,
+	query string,
+	args ...interface{},
+) (*sql.Row, error) {
+	var row *sql.Row
+	err := retry.Do(func() error {
+		r := db.QueryRowContext(ctx, query, args...)
+		row = r
+		return r.Err()
+	}, strategy)
+
+	return row, err
+}
+
 // BatchExec выполняет несколько запросов пакетно асинхронно.
 func (db *DB) BatchExec(ctx context.Context, in <-chan string) {
 	go func() {
