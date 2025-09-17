@@ -4,7 +4,6 @@ package dbpg
 import (
 	"context"
 	"database/sql"
-	"sync"
 	"time"
 
 	_ "github.com/lib/pq" // Драйвер PostgreSQL.
@@ -13,10 +12,10 @@ import (
 
 // DB представляет подключение к базе данных с master и slave узлами.
 type DB struct {
-	Master  *sql.DB
-	Slaves  []*sql.DB
-	rrIndex int // индекс для round-robin
-	rrMutex sync.Mutex
+	balancer *balancer
+
+	Master *sql.DB
+	Slaves []*sql.DB
 }
 
 // Options содержит опции конфигурации подключения к базе данных.
@@ -59,7 +58,11 @@ func New(masterDSN string, slaveDSNs []string, opts *Options) (*DB, error) {
 		applyOptions(slave, opts)
 		slaves = append(slaves, slave)
 	}
-	return &DB{Master: master, Slaves: slaves}, nil
+
+	// Создаем balancer.
+	balancer := newBalancer(len(slaveDSNs))
+
+	return &DB{Master: master, Slaves: slaves, balancer: balancer}, nil
 }
 
 // QueryContext выполняет запрос на slave если доступен, иначе на master.
@@ -137,13 +140,8 @@ func (db *DB) BatchExec(ctx context.Context, in <-chan string) {
 // selectDB возвращает базу для выполнения запроса: slave (round-robin) или master.
 func (db *DB) selectDB() *sql.DB {
 	if len(db.Slaves) > 0 {
-		// Выбираем slave по индексу rrIndex и обновляем индекс для следующего запроса.
-		db.rrMutex.Lock()
-		slave := db.Slaves[db.rrIndex]
-		db.rrIndex = (db.rrIndex + 1) % len(db.Slaves) // round-robin по кругу
-		db.rrMutex.Unlock()
-
-		return slave
+		// Выбираем slave при помощи balancer.
+		return db.Slaves[db.balancer.index()]
 	}
 
 	return db.Master
