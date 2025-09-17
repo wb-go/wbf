@@ -131,6 +131,7 @@ func (db *DB) QueryWithRetry(
 	return rows, err
 }
 
+// QueryRowWithRetry выполняет запрос с стратегией повторных попыток.
 func (db *DB) QueryRowWithRetry(
 	ctx context.Context,
 	strategy retry.Strategy,
