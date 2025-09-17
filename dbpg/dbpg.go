@@ -65,22 +65,22 @@ func New(masterDSN string, slaveDSNs []string, opts *Options) (*DB, error) {
 	return &DB{Master: master, Slaves: slaves, balancer: balancer}, nil
 }
 
+func (db *DB) selectDB() *sql.DB {
+	if len(db.Slaves) > 0 {
+		return db.Slaves[db.balancer.index()]
+	}
+
+	return db.Master
+}
+
 // QueryContext выполняет запрос на slave если доступен, иначе на master.
 func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	if len(db.Slaves) > 0 {
-		// Простейший round-robin.
-		return db.Slaves[db.balancer.index()].QueryContext(ctx, query, args...)
-	}
-	return db.Master.QueryContext(ctx, query, args...)
+	return db.selectDB().QueryContext(ctx, query, args...)
 }
 
 // QueryRowContext выполняет запрос на slave если доступен, иначе на master.
 func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
-	if len(db.Slaves) > 0 {
-		// Простейший round-robin.
-		return db.Slaves[db.balancer.index()].QueryRowContext(ctx, query, args...)
-	}
-	return db.Master.QueryRowContext(ctx, query, args...)
+	return db.selectDB().QueryRowContext(ctx, query, args...)
 }
 
 // ExecContext выполняет команду на master базе данных.
