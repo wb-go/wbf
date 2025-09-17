@@ -17,17 +17,16 @@ func newBalancer(max int) *balancer {
 	}
 }
 
-func (b *balancer) index() (res int) {
+func (b *balancer) index() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	res = b.idx
-	
-	if b.idx == b.max-1 {
-		b.idx = 0
-	} else {
-		b.idx++
+	if b.max <= 0 {
+		return 0
 	}
 
-	return
+	res := b.idx
+	b.idx = (b.idx + 1) % b.max
+	
+	return res
 }
