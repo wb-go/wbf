@@ -2,6 +2,11 @@
 package config
 
 import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
 
@@ -16,9 +21,26 @@ func New() *Config {
 	return &Config{v: v}
 }
 
-// Load читает конфигурацию из указанного файла.
-func (c *Config) Load(path string) error {
-	c.v.SetConfigFile(path)
+// Load читает конфигурацию из указанного файла и .env файла, если передан.
+// Также включает поддержку переменных окружения.
+func (c *Config) Load(configFilePath, envFilePath, envPrefix string) error {
+	if envFilePath != "" {
+		err := godotenv.Load(envFilePath)
+		if err != nil {
+			return fmt.Errorf("failed to load .env file %s: %w", envFilePath, err)
+		}
+	}
+
+	c.v.AutomaticEnv()
+
+	if envPrefix != "" {
+		c.v.SetEnvPrefix(envPrefix)
+	}
+
+	c.v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	c.v.SetConfigFile(configFilePath)
+
 	return c.v.ReadInConfig()
 }
 
@@ -27,14 +49,47 @@ func (c *Config) GetString(key string) string {
 	return c.v.GetString(key)
 }
 
+// GetInt получает целочисленное значение из конфигурации по ключу.
 func (c *Config) GetInt(key string) int {
 	return c.v.GetInt(key)
 }
 
+// GetBool получает логическое значение из конфигурации по ключу.
+func (c *Config) GetBool(key string) bool {
+	return c.v.GetBool(key)
+}
+
+// GetFloat64 получает вещественное значение из конфигурации по ключу.
+func (c *Config) GetFloat64(key string) float64 {
+	return c.v.GetFloat64(key)
+}
+
+// GetTime получает значение времени из конфигурации по ключу.
+func (c *Config) GetTime(key string) time.Time {
+	return c.v.GetTime(key)
+}
+
+// GetDuration получает значение продолжительности из конфигурации по ключу.
+func (c *Config) GetDuration(key string) time.Duration {
+	return c.v.GetDuration(key)
+}
+
+// GetStringSlice получает срез строк из конфигурации по ключу.
+func (c *Config) GetStringSlice(key string) []string {
+	return c.v.GetStringSlice(key)
+}
+
+// GetIntSlice получает срез целых чисел из конфигурации по ключу.
+func (c *Config) GetIntSlice(key string) []int {
+	return c.v.GetIntSlice(key)
+}
+
+// Unmarshal позволяет распаковать конфигурацию в структуру.
 func (c *Config) Unmarshal(rawVal any, opts ...viper.DecoderConfigOption) error {
 	return c.v.Unmarshal(rawVal, opts...)
 }
 
+// SetDefault устанавливает значение по умолчанию для ключа.
 func (c *Config) SetDefault(key string, value any) {
 	c.v.SetDefault(key, value)
 }
