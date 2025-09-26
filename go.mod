@@ -1,4 +1,4 @@
-module github.com/golovanevvs/wbf
+module github.com/wb-go/wbf
 
 go 1.21
 
