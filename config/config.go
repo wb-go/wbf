@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -22,7 +23,7 @@ func New() *Config {
 }
 
 // Load читает конфигурацию из указанного файла и .env файла, если передан.
-// Также включает поддержку переменных окружения.
+// Включает поддержку переменных окружения и флагов командной строки.
 func (c *Config) Load(configFilePath, envFilePath, envPrefix string) error {
 	if envFilePath != "" {
 		err := godotenv.Load(envFilePath)
@@ -41,7 +42,41 @@ func (c *Config) Load(configFilePath, envFilePath, envPrefix string) error {
 
 	c.v.SetConfigFile(configFilePath)
 
-	return c.v.ReadInConfig()
+	err := c.v.ReadInConfig()
+	if err != nil {
+		return fmt.Errorf("failed to read config %s: %w", configFilePath, err)
+	}
+
+	c.v.BindPFlags(pflag.CommandLine)
+
+	return nil
+}
+
+// DefineFlag позволяет объявлять флаги в формате: имя, значение по умолчанию, описание.
+func (c *Config) DefineFlag(name string, defaultValue any, usage string) {
+	switch v := defaultValue.(type) {
+	case string:
+		pflag.String(name, v, usage)
+	case int:
+		pflag.Int(name, v, usage)
+	case bool:
+		pflag.Bool(name, v, usage)
+	case float64:
+		pflag.Float64(name, v, usage)
+	case []string:
+		pflag.StringSlice(name, v, usage)
+	case []int:
+		pflag.IntSlice(name, v, usage)
+	case time.Duration:
+		pflag.Duration(name, v, usage)
+	case time.Time:
+		pflag.String(name, v.Format(time.RFC3339), usage)
+	}
+}
+
+// ParseFlags парсит объявленные флаги.
+func (c *Config) ParseFlags() {
+	pflag.Parse()
 }
 
 // GetString получает строковое значение из конфигурации по ключу.
