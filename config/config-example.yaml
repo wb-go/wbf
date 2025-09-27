@@ -1,0 +1,32 @@
+server:
+  addr: ":7777"
+  
+logging:
+  level: "debug"
+
+postgres:
+  max_open_conns: 10
+  max_idle_conns: 5
+  conn_max_lifetime: "5m"
+
+gin:
+  mode: "release"
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  client_id: "order-service-client"
+  consumer_group: "order-service-group"
+  version: "4.0.0"
+  retry_max: 5
+  required_acks: -1
+  partitioner: "roundrobin"
+  enable_return_success: true
+  topic: "Topic name"
+  consumer_worker_count: 8
+
+redis:
+  addr: ":6379"
+  password: ""
+  db: 0
+  ttl: "30s"
