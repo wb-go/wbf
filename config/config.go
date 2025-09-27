@@ -52,25 +52,30 @@ func (c *Config) Load(configFilePath, envFilePath, envPrefix string) error {
 	return nil
 }
 
-// DefineFlag позволяет объявлять флаги в формате: имя, значение по умолчанию, описание.
-func (c *Config) DefineFlag(name string, defaultValue any, usage string) {
+// DefineFlag позволяет объявлять флаги (короткий и длинный) и привязывать их к ключу конфигурации.
+func (c *Config) DefineFlag(short, long, configKey string, defaultValue any, usage string) {
 	switch v := defaultValue.(type) {
 	case string:
-		pflag.String(name, v, usage)
+		pflag.StringP(long, short, v, usage)
+		c.v.BindPFlag(configKey, pflag.Lookup(long))
 	case int:
-		pflag.Int(name, v, usage)
+		pflag.IntP(long, short, v, usage)
+		c.v.BindPFlag(configKey, pflag.Lookup(long))
 	case bool:
-		pflag.Bool(name, v, usage)
+		pflag.BoolP(long, short, v, usage)
+		c.v.BindPFlag(configKey, pflag.Lookup(long))
 	case float64:
-		pflag.Float64(name, v, usage)
+		pflag.Float64P(long, short, v, usage)
+		c.v.BindPFlag(configKey, pflag.Lookup(long))
 	case []string:
-		pflag.StringSlice(name, v, usage)
+		pflag.StringSliceP(long, short, v, usage)
+		c.v.BindPFlag(configKey, pflag.Lookup(long))
 	case []int:
-		pflag.IntSlice(name, v, usage)
+		pflag.IntSliceP(long, short, v, usage)
+		c.v.BindPFlag(configKey, pflag.Lookup(long))
 	case time.Duration:
-		pflag.Duration(name, v, usage)
-	case time.Time:
-		pflag.String(name, v.Format(time.RFC3339), usage)
+		pflag.DurationP(long, short, v, usage)
+		c.v.BindPFlag(configKey, pflag.Lookup(long))
 	}
 }
 
