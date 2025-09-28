@@ -3,6 +3,7 @@ package redis
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/wb-go/wbf/retry"
@@ -35,7 +36,7 @@ func (c *Client) Set(ctx context.Context, key string, value interface{}) error {
 }
 
 func (c *Client) SetWithExpiration(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
-    return c.Client.Set(ctx, key, value, expiration).Err()
+	return c.Client.Set(ctx, key, value, expiration).Err()
 }
 
 // GetWithRetry получает значение с стратегией повторных попыток.
@@ -71,5 +72,3 @@ func (c *Client) BatchWriter(ctx context.Context, in <-chan [2]string) {
 		}
 	}()
 }
-
-
