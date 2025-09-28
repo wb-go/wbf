@@ -34,6 +34,10 @@ func (c *Client) Set(ctx context.Context, key string, value interface{}) error {
 	return c.Client.Set(ctx, key, value, 0).Err()
 }
 
+func (c *Client) SetWithExpiration(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
+    return c.Client.Set(ctx, key, value, expiration).Err()
+}
+
 // GetWithRetry получает значение с стратегией повторных попыток.
 func (c *Client) GetWithRetry(ctx context.Context, strategy retry.Strategy, key string) (string, error) {
 	var val string
@@ -67,3 +71,5 @@ func (c *Client) BatchWriter(ctx context.Context, in <-chan [2]string) {
 		}
 	}()
 }
+
+
