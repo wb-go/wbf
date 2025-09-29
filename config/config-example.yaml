@@ -1,7 +1,7 @@
 server:
   addr: ":7777"
   
-logging:
+logger:
   level: "debug"
 
 postgres:
