@@ -9,6 +9,9 @@ import (
 	"github.com/wb-go/wbf/retry"
 )
 
+// NoMatches is used for when Redis did not get any matches.
+const NoMatches = redis.Nil
+
 // Client оборачивает Redis клиент.
 type Client struct {
 	*redis.Client
