@@ -53,30 +53,31 @@ func (c *Config) Load(configFilePath, envFilePath, envPrefix string) error {
 }
 
 // DefineFlag позволяет объявлять флаги (короткий и длинный) и привязывать их к ключу конфигурации.
-func (c *Config) DefineFlag(short, long, configKey string, defaultValue any, usage string) {
+func (c *Config) DefineFlag(short, long, configKey string, defaultValue any, usage string) (err error) {
 	switch v := defaultValue.(type) {
 	case string:
 		pflag.StringP(long, short, v, usage)
-		c.v.BindPFlag(configKey, pflag.Lookup(long))
+		err = c.v.BindPFlag(configKey, pflag.Lookup(long))
 	case int:
 		pflag.IntP(long, short, v, usage)
-		c.v.BindPFlag(configKey, pflag.Lookup(long))
+		err = c.v.BindPFlag(configKey, pflag.Lookup(long))
 	case bool:
 		pflag.BoolP(long, short, v, usage)
-		c.v.BindPFlag(configKey, pflag.Lookup(long))
+		err = c.v.BindPFlag(configKey, pflag.Lookup(long))
 	case float64:
 		pflag.Float64P(long, short, v, usage)
-		c.v.BindPFlag(configKey, pflag.Lookup(long))
+		err = c.v.BindPFlag(configKey, pflag.Lookup(long))
 	case []string:
 		pflag.StringSliceP(long, short, v, usage)
-		c.v.BindPFlag(configKey, pflag.Lookup(long))
+		err = c.v.BindPFlag(configKey, pflag.Lookup(long))
 	case []int:
 		pflag.IntSliceP(long, short, v, usage)
-		c.v.BindPFlag(configKey, pflag.Lookup(long))
+		err = c.v.BindPFlag(configKey, pflag.Lookup(long))
 	case time.Duration:
 		pflag.DurationP(long, short, v, usage)
-		c.v.BindPFlag(configKey, pflag.Lookup(long))
+		err = c.v.BindPFlag(configKey, pflag.Lookup(long))
 	}
+	return
 }
 
 // ParseFlags парсит объявленные флаги.
