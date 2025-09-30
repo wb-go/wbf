@@ -6,12 +6,16 @@ import (
 	"database/sql"
 	"time"
 
-	_ "github.com/lib/pq" // Драйвер PostgreSQL.
+
 	"github.com/wb-go/wbf/retry"
+
+	_ "github.com/lib/pq"
 )
 
 // DB представляет подключение к базе данных с master и slave узлами.
 type DB struct {
+	balancer *balancer
+
 	Master *sql.DB
 	Slaves []*sql.DB
 }
@@ -56,16 +60,21 @@ func New(masterDSN string, slaveDSNs []string, opts *Options) (*DB, error) {
 		applyOptions(slave, opts)
 		slaves = append(slaves, slave)
 	}
-	return &DB{Master: master, Slaves: slaves}, nil
+
+	// Создаем balancer.
+	balancer := newBalancer(len(slaveDSNs))
+
+	return &DB{Master: master, Slaves: slaves, balancer: balancer}, nil
 }
 
 // QueryContext выполняет запрос на slave если доступен, иначе на master.
 func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	if len(db.Slaves) > 0 {
-		// Простейший round-robin.
-		return db.Slaves[0].QueryContext(ctx, query, args...)
-	}
-	return db.Master.QueryContext(ctx, query, args...)
+	return db.selectDB().QueryContext(ctx, query, args...)
+}
+
+// QueryRowContext выполняет запрос на slave если доступен, иначе на master.
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	return db.selectDB().QueryRowContext(ctx, query, args...)
 }
 
 // ExecContext выполняет команду на master базе данных.
@@ -116,6 +125,23 @@ func (db *DB) QueryWithRetry(
 	return rows, err
 }
 
+// QueryRowWithRetry выполняет запрос с стратегией повторных попыток.
+func (db *DB) QueryRowWithRetry(
+	ctx context.Context,
+	strategy retry.Strategy,
+	query string,
+	args ...interface{},
+) (*sql.Row, error) {
+	var row *sql.Row
+	err := retry.Do(func() error {
+		r := db.QueryRowContext(ctx, query, args...)
+		row = r
+		return r.Err()
+	}, strategy)
+
+	return row, err
+}
+
 // BatchExec выполняет несколько запросов пакетно асинхронно.
 func (db *DB) BatchExec(ctx context.Context, in <-chan string) {
 	go func() {
@@ -128,4 +154,14 @@ func (db *DB) BatchExec(ctx context.Context, in <-chan string) {
 			}
 		}
 	}()
+}
+
+// selectDB возвращает базу для выполнения запроса: slave (round-robin) или master.
+func (db *DB) selectDB() *sql.DB {
+	if len(db.Slaves) > 0 {
+		// Выбираем slave при помощи balancer.
+		return db.Slaves[db.balancer.index()]
+	}
+
+	return db.Master
 }
