@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -53,7 +54,10 @@ func (c *Config) Load(configFilePath, envFilePath, envPrefix string) error {
 }
 
 // DefineFlag позволяет объявлять флаги (короткий и длинный) и привязывать их к ключу конфигурации.
-func (c *Config) DefineFlag(short, long, configKey string, defaultValue any, usage string) (err error) {
+func (c *Config) DefineFlag(short, long, configKey string, defaultValue any, usage string) error {
+	if len([]rune(short)) > 1 {
+		return errors.New("no more than one character is required")
+	}
 	switch v := defaultValue.(type) {
 	case string:
 		pflag.StringP(long, short, v, usage)
@@ -70,8 +74,10 @@ func (c *Config) DefineFlag(short, long, configKey string, defaultValue any, usa
 	case time.Duration:
 		pflag.DurationP(long, short, v, usage)
 	}
-	err = c.v.BindPFlag(configKey, pflag.Lookup(long))
-	return
+	if err := c.v.BindPFlag(configKey, pflag.Lookup(long)); err != nil {
+		return err
+	}
+	return nil
 }
 
 // ParseFlags парсит объявленные флаги.
