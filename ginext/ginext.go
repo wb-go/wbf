@@ -2,7 +2,7 @@
 package ginext
 
 import (
-  "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 )
 
 // Аналоги библиотечных типов
@@ -12,32 +12,33 @@ type H = gin.H
 
 // Engine расширяет стандартный Gin Engine.
 type Engine struct {
-  *gin.Engine
+	*gin.Engine
 }
 
 // RouterGroup позволяет объединять хэндлеры в группы
 type RouterGroup struct {
-  *gin.RouterGroup
+	*gin.RouterGroup
 }
 
 // New создает новый экземпляр Engine.
-func New() *Engine {
-  return &Engine{gin.New()}
+func New(ginMode string) *Engine {
+	gin.SetMode(ginMode)
+	return &Engine{gin.New()}
 }
 
 // Run запуск сервера
 func (e *Engine) Run(addr ...string) error {
-  return e.Engine.Run(addr...)
+	return e.Engine.Run(addr...)
 }
 
 // Group используется для создания группы роутов
 func (e *Engine) Group(relativePath string, handlers ...HandlerFunc) *RouterGroup {
-  return &RouterGroup{e.Engine.Group(relativePath, handlers...)}
+	return &RouterGroup{e.Engine.Group(relativePath, handlers...)}
 }
 
 // Use используется для установки middleware
 func (e *Engine) Use(middleware ...HandlerFunc) {
-  e.Engine.Use(middleware...)
+	e.Engine.Use(middleware...)
 }
 
 func (g *RouterGroup) Use(middleware ...HandlerFunc) {
@@ -45,16 +46,16 @@ func (g *RouterGroup) Use(middleware ...HandlerFunc) {
 }
 
 func (e *Engine) LoadHTMLGlob(pattern string) {
-  e.Engine.LoadHTMLGlob(pattern)
+	e.Engine.LoadHTMLGlob(pattern)
 }
 
 // Стандартные middleware
 func Logger() HandlerFunc {
-  return gin.Logger()
+	return gin.Logger()
 }
 
 func Recovery() HandlerFunc {
-  return gin.Recovery()
+	return gin.Recovery()
 }
 
 // HTTP-методы для Engine
