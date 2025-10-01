@@ -22,7 +22,11 @@ type RouterGroup struct {
 
 // New создает новый экземпляр Engine.
 func New(ginMode string) *Engine {
-	gin.SetMode(ginMode)
+	if ginMode == "release" {
+		gin.SetMode(gin.ReleaseMode)
+	} else {
+		gin.SetMode("")
+	}
 	return &Engine{gin.New()}
 }
 
