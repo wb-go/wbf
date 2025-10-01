@@ -7,8 +7,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Zerolog - тип логгера, экспортируемый пакетом zlog.
+type Zerolog = zerolog.Logger
+
 // Logger глобальный экземпляр логгера.
-var Logger zerolog.Logger
+var Logger Zerolog
 
 // Init инициализирует глобальный логгер.
 func Init() {
