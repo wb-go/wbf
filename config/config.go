@@ -31,6 +31,10 @@ func (c *Config) GetInt(key string) int {
 	return c.v.GetInt(key)
 }
 
+func (c *Config) GetSlice(key string) []string {
+	return c.v.GetStringSlice(key)
+}
+
 func (c *Config) Unmarshal(rawVal any, opts ...viper.DecoderConfigOption) error {
 	return c.v.Unmarshal(rawVal, opts...)
 }
