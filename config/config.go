@@ -24,7 +24,7 @@ func New() *Config {
 }
 
 // LoadEnv загружает переменные окружения из файла .env в os.Environ().
-func LoadEnv(envFilePath string) error {
+func (c *Config) LoadEnv(envFilePath string) error {
 	if envFilePath == "" {
 		return nil
 	}
