@@ -134,6 +134,17 @@ func (c *Config) Unmarshal(rawVal any, opts ...viper.DecoderConfigOption) error 
 	return c.v.Unmarshal(rawVal, opts...)
 }
 
+// UnmarshalKey позволяет распаковать часть конфигурации по ключу в структуру.
+func (c *Config) UnmarshalKey(key string, rawVal any, opts ...viper.DecoderConfigOption) error {
+	return c.v.UnmarshalKey(key, rawVal, opts...)
+}
+
+// UnmarshalExact позволяет строго распаковать конфигурацию в структуру.
+// Вернёт ошибку, если в файле есть ключи, которых нет в структуре.
+func (c *Config) UnmarshalExact(rawVal any, opts ...viper.DecoderConfigOption) error {
+	return c.v.UnmarshalExact(rawVal, opts...)
+}
+
 // SetDefault устанавливает значение по умолчанию для ключа.
 func (c *Config) SetDefault(key string, value any) {
 	c.v.SetDefault(key, value)
