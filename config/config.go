@@ -47,7 +47,7 @@ func (c *Config) Load(configFilePath, envPrefix string) error {
 
 	c.v.SetConfigFile(configFilePath)
 
-	err := c.v.ReadInConfig()
+	err := c.v.MergeInConfig()
 	if err != nil {
 		return fmt.Errorf("failed to read config %s: %w", configFilePath, err)
 	}
