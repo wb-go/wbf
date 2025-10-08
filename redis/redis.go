@@ -75,3 +75,15 @@ func (c *Client) BatchWriter(ctx context.Context, in <-chan [2]string) {
 		}
 	}()
 }
+
+// Del удаляет значение по ключу из Redis.
+func (c *Client) Del(ctx context.Context, key string) error {
+	return c.Client.Del(ctx, key).Err()
+}
+
+// DelWithRetry удаляет значение из Redis со стратегией повторных попыток.
+func (c *Client) DelWithRetry(ctx context.Context, strategy retry.Strategy, key string) error {
+	return retry.Do(func() error {
+		return c.Del(ctx, key)
+	}, strategy)
+}
