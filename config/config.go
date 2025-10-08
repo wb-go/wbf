@@ -23,16 +23,20 @@ func New() *Config {
 	return &Config{v: v}
 }
 
-// Load читает конфигурацию из указанного файла и .env файла, если передан.
-// Включает поддержку переменных окружения и флагов командной строки.
-func (c *Config) Load(configFilePath, envFilePath, envPrefix string) error {
-	if envFilePath != "" {
-		err := godotenv.Load(envFilePath)
-		if err != nil {
-			return fmt.Errorf("failed to load .env file %s: %w", envFilePath, err)
-		}
+// LoadEnv загружает переменные окружения из файла .env в os.Environ().
+func LoadEnv(envFilePath string) error {
+	if envFilePath == "" {
+		return nil
 	}
+	if err := godotenv.Load(envFilePath); err != nil {
+		return fmt.Errorf("failed to load .env: %w", err)
+	}
+	return nil
+}
 
+// Load читает конфигурацию из указанного файла.
+// Включает поддержку переменных окружения и флагов командной строки.
+func (c *Config) Load(configFilePath, envPrefix string) error {
 	c.v.AutomaticEnv()
 
 	if envPrefix != "" {
