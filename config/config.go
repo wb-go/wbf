@@ -2,7 +2,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -23,44 +22,41 @@ func New() *Config {
 	return &Config{v: v}
 }
 
-// LoadEnv загружает переменные окружения из файла .env в os.Environ().
-func (c *Config) LoadEnv(envFilePath string) error {
-	if envFilePath == "" {
-		return nil
-	}
-	if err := godotenv.Load(envFilePath); err != nil {
-		return fmt.Errorf("failed to load .env: %w", err)
+// LoadEnvFiles загружает один или несколько файлов .env в os.Environ().
+func (c *Config) LoadEnvFiles(paths ...string) error {
+	for _, path := range paths {
+		if err := godotenv.Load(path); err != nil {
+			return fmt.Errorf("failed to load env file %s: %w", path, err)
+		}
 	}
 	return nil
 }
 
-// Load читает конфигурацию из указанного файла.
-// Включает поддержку переменных окружения и флагов командной строки.
-func (c *Config) Load(configFilePath, envPrefix string) error {
-	c.v.AutomaticEnv()
+// LoadConfigFiles загружает и объединяет несколько файлов конфигурации.
+func (c *Config) LoadConfigFiles(paths ...string) error {
+	for _, cfgPath := range paths {
+		c.v.SetConfigFile(cfgPath)
+		if err := c.v.MergeInConfig(); err != nil {
+			return fmt.Errorf("failed to load config file %s: %w", cfgPath, err)
+		}
+	}
+	return nil
+}
 
+// EnableEnv включает автоматическую загрузку переменных окружения.
+// envPrefix (если задан) используется как префикс для всех ключей.
+func (c *Config) EnableEnv(envPrefix string) {
+	c.v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	if envPrefix != "" {
 		c.v.SetEnvPrefix(envPrefix)
 	}
-
-	c.v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	c.v.SetConfigFile(configFilePath)
-
-	err := c.v.MergeInConfig()
-	if err != nil {
-		return fmt.Errorf("failed to read config %s: %w", configFilePath, err)
-	}
-
-	c.v.BindPFlags(pflag.CommandLine)
-
-	return nil
+	c.v.AutomaticEnv()
 }
 
 // DefineFlag позволяет объявлять флаги (короткий и длинный) и привязывать их к ключу конфигурации.
 func (c *Config) DefineFlag(short, long, configKey string, defaultValue any, usage string) error {
-	if len([]rune(short)) > 1 {
-		return errors.New("no more than one character is required")
+	if len(short) > 1 {
+		return fmt.Errorf("short flag must be one character, got %s", short)
 	}
 	switch v := defaultValue.(type) {
 	case string:
@@ -77,16 +73,22 @@ func (c *Config) DefineFlag(short, long, configKey string, defaultValue any, usa
 		pflag.IntSliceP(long, short, v, usage)
 	case time.Duration:
 		pflag.DurationP(long, short, v, usage)
+	default:
+		return fmt.Errorf("unsupported flag type: %T", v)
 	}
-	if err := c.v.BindPFlag(configKey, pflag.Lookup(long)); err != nil {
-		return err
+
+	flag := pflag.Lookup(long)
+	if flag == nil {
+		return fmt.Errorf("flag %q not found", long)
 	}
-	return nil
+
+	return c.v.BindPFlag(configKey, flag)
 }
 
 // ParseFlags парсит объявленные флаги.
-func (c *Config) ParseFlags() {
+func (c *Config) ParseFlags() error {
 	pflag.Parse()
+	return c.v.BindPFlags(pflag.CommandLine)
 }
 
 // GetString получает строковое значение из конфигурации по ключу.
