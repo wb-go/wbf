@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,6 +10,14 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+)
+
+var (
+	ErrShortFlagLength = errors.New("short flag must be one character")
+	ErrUnsupportedFlag = errors.New("unsupported flag type")
+	ErrFlagNotFound    = errors.New("flag not found")
+	ErrLoadEnvFile     = errors.New("failed to load env file")
+	ErrLoadConfigFile  = errors.New("failed to load config file")
 )
 
 // Config оборачивает экземпляр конфигурации Viper.
@@ -26,7 +35,7 @@ func New() *Config {
 func (c *Config) LoadEnvFiles(paths ...string) error {
 	for _, path := range paths {
 		if err := godotenv.Load(path); err != nil {
-			return fmt.Errorf("failed to load env file %s: %w", path, err)
+			return fmt.Errorf("%w %s: %v", ErrLoadEnvFile, path, err)
 		}
 	}
 	return nil
@@ -37,7 +46,7 @@ func (c *Config) LoadConfigFiles(paths ...string) error {
 	for _, cfgPath := range paths {
 		c.v.SetConfigFile(cfgPath)
 		if err := c.v.MergeInConfig(); err != nil {
-			return fmt.Errorf("failed to load config file %s: %w", cfgPath, err)
+			return fmt.Errorf("%w %s: %v", ErrLoadConfigFile, cfgPath, err)
 		}
 	}
 	return nil
@@ -56,7 +65,7 @@ func (c *Config) EnableEnv(envPrefix string) {
 // DefineFlag позволяет объявлять флаги (короткий и длинный) и привязывать их к ключу конфигурации.
 func (c *Config) DefineFlag(short, long, configKey string, defaultValue any, usage string) error {
 	if len(short) > 1 {
-		return fmt.Errorf("short flag must be one character, got %s", short)
+		return fmt.Errorf("%w: got %s", ErrShortFlagLength, short)
 	}
 	switch v := defaultValue.(type) {
 	case string:
@@ -74,12 +83,12 @@ func (c *Config) DefineFlag(short, long, configKey string, defaultValue any, usa
 	case time.Duration:
 		pflag.DurationP(long, short, v, usage)
 	default:
-		return fmt.Errorf("unsupported flag type: %T", v)
+		return fmt.Errorf("%w: %T", ErrUnsupportedFlag, v)
 	}
 
 	flag := pflag.Lookup(long)
 	if flag == nil {
-		return fmt.Errorf("flag %q not found", long)
+		return fmt.Errorf("%w %q", ErrFlagNotFound, long)
 	}
 
 	return c.v.BindPFlag(configKey, flag)
