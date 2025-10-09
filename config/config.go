@@ -35,7 +35,7 @@ func New() *Config {
 func (c *Config) LoadEnvFiles(paths ...string) error {
 	for _, path := range paths {
 		if err := godotenv.Load(path); err != nil {
-			return fmt.Errorf("%w %s: %v", ErrLoadEnvFile, path, err)
+			return fmt.Errorf("%w %s: %w", ErrLoadEnvFile, path, err)
 		}
 	}
 	return nil
@@ -46,7 +46,7 @@ func (c *Config) LoadConfigFiles(paths ...string) error {
 	for _, cfgPath := range paths {
 		c.v.SetConfigFile(cfgPath)
 		if err := c.v.MergeInConfig(); err != nil {
-			return fmt.Errorf("%w %s: %v", ErrLoadConfigFile, cfgPath, err)
+			return fmt.Errorf("%w %s: %w", ErrLoadConfigFile, cfgPath, err)
 		}
 	}
 	return nil
