@@ -13,11 +13,16 @@ import (
 )
 
 var (
+	// ErrShortFlagLength возвращается, если короткий флаг содержит более одного символа.
 	ErrShortFlagLength = errors.New("short flag must be one character")
+	// ErrUnsupportedFlag возвращается, если тип флага не поддерживается.
 	ErrUnsupportedFlag = errors.New("unsupported flag type")
-	ErrFlagNotFound    = errors.New("flag not found")
-	ErrLoadEnvFile     = errors.New("failed to load env file")
-	ErrLoadConfigFile  = errors.New("failed to load config file")
+	// ErrFlagNotFound возвращается, если указанный флаг не найден.
+	ErrFlagNotFound = errors.New("flag not found")
+	// ErrLoadEnvFile возвращается при ошибке загрузки .env файла.
+	ErrLoadEnvFile = errors.New("failed to load env file")
+	// ErrLoadConfigFile возвращается при ошибке загрузки файла конфигурации.
+	ErrLoadConfigFile = errors.New("failed to load config file")
 )
 
 // Config оборачивает экземпляр конфигурации Viper.
