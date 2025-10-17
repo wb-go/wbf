@@ -1,5 +1,5 @@
 // Package rabbitmq provides a high-level wrapper over amqp091-go
-// for working with RabbitMQ. Currently supports only basic functionality :).
+// for working with RabbitMQ. Currently supports only basic functionality.
 package rabbitmq
 
 import (
@@ -11,76 +11,82 @@ import (
 	"github.com/wb-go/wbf/retry"
 )
 
+// Connection is an alias for amqp091.Connection.
 type Connection = amqp091.Connection
+
+// Channel is an alias for amqp091.Channel.
 type Channel = amqp091.Channel
+
+// Queue is an alias for amqp091.Queue.
 type Queue = amqp091.Queue
 
+// QueueManager manages queues on a specific AMQP channel.
 type QueueManager struct {
 	channel *Channel
 }
 
+// QueueConfig holds configuration for a queue.
 type QueueConfig struct {
-	Durable    bool          // If true, the queue is persisted on RabbitMQ restart
-	AutoDelete bool          // If true, the queue is deleted when unused
-	Exclusive  bool          // If true, the queue is exclusive to a single connection
-	NoWait     bool          // If true, the server will not send a confirmation
-	Args       amqp091.Table // Additional arguments
+	Durable    bool          // If true, the queue is persisted on RabbitMQ restart.
+	AutoDelete bool          // If true, the queue is deleted when unused.
+	Exclusive  bool          // If true, the queue is exclusive to a single connection.
+	NoWait     bool          // If true, the server will not send a confirmation.
+	Args       amqp091.Table // Additional arguments.
 }
 
+// Publisher represents a message publisher for a specific exchange.
 type Publisher struct {
 	channel  *Channel
 	exchange string
 }
 
+// PublishingOptions contains optional parameters for publishing messages.
 type PublishingOptions struct {
-	Mandatory  bool          // If true, message is returned if there is no matching queue
-	Immediate  bool          // If true, message is returned if there is no active consumer
-	Expiration time.Duration // Message TTL
-	Headers    amqp091.Table // Message headers
+	Mandatory  bool          // If true, message is returned if there is no matching queue.
+	Immediate  bool          // If true, message is returned if there is no active consumer.
+	Expiration time.Duration // Message TTL.
+	Headers    amqp091.Table // Message headers.
 }
 
+// ConsumerConfig holds configuration for a consumer.
 type ConsumerConfig struct {
-	Queue     string        // Queue name
-	Consumer  string        // Consumer tag
-	AutoAck   bool          // Automatically acknowledge messages
-	Exclusive bool          // Exclusive access to the queue
-	NoLocal   bool          // Not supported in RabbitMQ
-	NoWait    bool          // If true, the server will not send a confirmation
-	Args      amqp091.Table // Additional arguments
+	Queue     string        // Queue name.
+	Consumer  string        // Consumer tag.
+	AutoAck   bool          // Automatically acknowledge messages.
+	Exclusive bool          // Exclusive access to the queue.
+	NoLocal   bool          // Not supported in RabbitMQ.
+	NoWait    bool          // If true, the server will not send a confirmation.
+	Args      amqp091.Table // Additional arguments.
 }
 
+// Consumer represents a RabbitMQ consumer.
 type Consumer struct {
 	channel *Channel
 	config  *ConsumerConfig
 }
 
+// Exchange represents a RabbitMQ exchange.
 type Exchange struct {
-	name       string        // Exchange name
-	kind       string        // Exchange type: direct, fanout, topic, headers
-	Durable    bool          // If true, exchange is persisted after restart
-	AutoDelete bool          // If true, exchange is deleted when unused
-	Internal   bool          // If true, exchange cannot be published directly
-	NoWait     bool          // If true, no server confirmation is expected
-	Args       amqp091.Table // Additional arguments
+	name       string        // Exchange name.
+	kind       string        // Exchange type: direct, fanout, topic, headers.
+	Durable    bool          // If true, exchange is persisted after restart.
+	AutoDelete bool          // If true, exchange is deleted when unused.
+	Internal   bool          // If true, exchange cannot be published directly.
+	NoWait     bool          // If true, no server confirmation is expected.
+	Args       amqp091.Table // Additional arguments.
 }
 
-// Name returns the exchange name
+// Name returns the exchange name.
 func (e *Exchange) Name() string {
 	return e.name
 }
 
-// Kind returns the exchange type
+// Kind returns the exchange type.
 func (e *Exchange) Kind() string {
-	return e.name
+	return e.kind
 }
 
-/*
-NewExchange creates a new Exchange instance.
-
-name - exchange name
-
-kind - exchange type: direct, fanout, topic, headers
-*/
+// NewExchange creates a new Exchange instance.
 func NewExchange(name, kind string) *Exchange {
 	return &Exchange{
 		name: name,
@@ -88,13 +94,7 @@ func NewExchange(name, kind string) *Exchange {
 	}
 }
 
-/*
-NewConsumer creates a new Consumer instance.
-
-ch - AMQP channel
-
-config - consumer configuration
-*/
+// NewConsumer creates a new Consumer instance.
 func NewConsumer(ch *Channel, config *ConsumerConfig) *Consumer {
 	return &Consumer{
 		channel: ch,
@@ -102,24 +102,14 @@ func NewConsumer(ch *Channel, config *ConsumerConfig) *Consumer {
 	}
 }
 
-/*
-NewConsumerConfig creates a default consumer configuration.
-
-queue - name of the queue to subscribe to
-*/
+// NewConsumerConfig creates a default ConsumerConfig.
 func NewConsumerConfig(queue string) *ConsumerConfig {
 	return &ConsumerConfig{
 		Queue: queue,
 	}
 }
 
-/*
-NewPublisher creates a new Publisher instance.
-
-ch - AMQP channel
-
-exchange - exchange name
-*/
+// NewPublisher creates a new Publisher instance.
 func NewPublisher(ch *Channel, exchange string) *Publisher {
 	return &Publisher{
 		channel:  ch,
@@ -127,26 +117,14 @@ func NewPublisher(ch *Channel, exchange string) *Publisher {
 	}
 }
 
-/*
-NewQueueManager creates a new QueueManager instance.
-
-channel - AMQP channel used for queue management
-*/
+// NewQueueManager creates a new QueueManager instance.
 func NewQueueManager(channel *Channel) *QueueManager {
 	return &QueueManager{
 		channel: channel,
 	}
 }
 
-/*
-Connect establishes a connection to RabbitMQ with retry attempts.
-
-url - connection string
-
-retries - number of attempts
-
-pause - delay between attempts
-*/
+// Connect establishes a connection to RabbitMQ with retry attempts.
 func Connect(url string, retries int, pause time.Duration) (*Connection, error) {
 	var conn *amqp091.Connection
 	var err error
@@ -160,14 +138,10 @@ func Connect(url string, retries int, pause time.Duration) (*Connection, error) 
 		time.Sleep(pause)
 	}
 
-	return nil, fmt.Errorf("failed to connect after %d attempts: %v", retries, err)
+	return nil, fmt.Errorf("failed to connect after %d attempts: %w", retries, err)
 }
 
-/*
-BindToChannel declares an exchange on the given AMQP channel.
-
-ch - AMQP channel
-*/
+// BindToChannel declares an exchange on the given AMQP channel.
 func (e *Exchange) BindToChannel(ch *Channel) error {
 	return ch.ExchangeDeclare(
 		e.name,
@@ -180,13 +154,7 @@ func (e *Exchange) BindToChannel(ch *Channel) error {
 	)
 }
 
-/*
-DeclareQueue declares a queue with a given name and configuration.
-
-name - queue name
-
-config - optional configuration parameters
-*/
+// DeclareQueue declares a queue with a given name and configuration.
 func (qm *QueueManager) DeclareQueue(name string, config ...QueueConfig) (Queue, error) {
 	cfg := &QueueConfig{}
 
@@ -204,17 +172,7 @@ func (qm *QueueManager) DeclareQueue(name string, config ...QueueConfig) (Queue,
 	)
 }
 
-/*
-Publish sends a message with a given routingKey to the exchange associated with Publisher.
-
-body - message body
-
-exchange - target exchange
-
-contentType - MIME content type
-
-options - optional publishing options
-*/
+// Publish sends a message with a given routing key to the exchange associated with Publisher.
 func (p *Publisher) Publish(body []byte, routingKey, contentType string, options ...PublishingOptions) error {
 	var option PublishingOptions
 
@@ -241,28 +199,14 @@ func (p *Publisher) Publish(body []byte, routingKey, contentType string, options
 	)
 }
 
-/*
-PublishWithRetry publishes a message with retry attempts on failure.
-
-body - message body
-
-exchange - target exchange
-
-contentType - MIME content type
-
-strategy - retry strategy
-*/
+// PublishWithRetry publishes a message with retry attempts on failure.
 func (p *Publisher) PublishWithRetry(body []byte, routingKey, contentType string, strategy retry.Strategy, options ...PublishingOptions) error {
 	return retry.Do(func() error {
 		return p.Publish(body, routingKey, contentType, options...)
 	}, strategy)
 }
 
-/*
-Consume starts message consumption and sends messages into the provided channel.
-
-msgChan - channel to receive message bodies
-*/
+// Consume starts message consumption and sends messages into the provided channel.
 func (c *Consumer) Consume(msgChan chan []byte) error {
 	msgs, err := c.channel.Consume(
 		c.config.Queue,
@@ -294,11 +238,7 @@ func (c *Consumer) Consume(msgChan chan []byte) error {
 	return nil
 }
 
-/*
-ConsumeWithRetry attempts to consume messages with a retry strategy on failure.
-
-msgChan - channel to receive message bodies
-*/
+// ConsumeWithRetry attempts to consume messages with a retry strategy on failure.
 func (c *Consumer) ConsumeWithRetry(msgChan chan []byte, strategy retry.Strategy) error {
 	return retry.Do(func() error {
 		return c.Consume(msgChan)
