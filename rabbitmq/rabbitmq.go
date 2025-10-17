@@ -200,7 +200,12 @@ func (p *Publisher) Publish(body []byte, routingKey, contentType string, options
 }
 
 // PublishWithRetry publishes a message with retry attempts on failure.
-func (p *Publisher) PublishWithRetry(body []byte, routingKey, contentType string, strategy retry.Strategy, options ...PublishingOptions) error {
+func (p *Publisher) PublishWithRetry(
+	body []byte,
+	routingKey, contentType string,
+	strategy retry.Strategy,
+	options ...PublishingOptions,
+) error {
 	return retry.Do(func() error {
 		return p.Publish(body, routingKey, contentType, options...)
 	}, strategy)
