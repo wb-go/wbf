@@ -5,7 +5,6 @@ import (
 	"context"
 
 	"github.com/segmentio/kafka-go"
-
 	"github.com/wb-go/wbf/retry"
 )
 

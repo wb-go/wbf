@@ -33,7 +33,6 @@ linters:
     - forbidigo
     - lll
     - stylecheck
-    - scopelint
     - gosec
     - asasalint
     - bodyclose
