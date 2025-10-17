@@ -1,4 +1,4 @@
-// Package dbpg предоставляет управление подключениями к PostgreSQL с поддержкой master-slave.
+// Package dbpg provides PostgreSQL connection management with master-slave support.
 package dbpg
 
 import (
@@ -6,13 +6,12 @@ import (
 	"database/sql"
 	"time"
 
+	_ "github.com/lib/pq"
 
 	"github.com/wb-go/wbf/retry"
-
-	_ "github.com/lib/pq"
 )
 
-// DB представляет подключение к базе данных с master и slave узлами.
+// DB represents a database connection with master and slave nodes.
 type DB struct {
 	balancer *balancer
 
@@ -20,7 +19,7 @@ type DB struct {
 	Slaves []*sql.DB
 }
 
-// Options содержит опции конфигурации подключения к базе данных.
+// Options defines database connection configuration options.
 type Options struct {
 	MaxOpenConns    int
 	MaxIdleConns    int
@@ -42,7 +41,7 @@ func applyOptions(db *sql.DB, opts *Options) {
 	}
 }
 
-// New создает новый экземпляр DB с master и slave подключениями.
+// New creates a new DB instance with master and slave connections.
 func New(masterDSN string, slaveDSNs []string, opts *Options) (*DB, error) {
 	master, err := sql.Open("postgres", masterDSN)
 	if err != nil {
@@ -50,7 +49,7 @@ func New(masterDSN string, slaveDSNs []string, opts *Options) (*DB, error) {
 	}
 	applyOptions(master, opts)
 
-	// Предварительно выделяем память для лучшей производительности.
+	// Preallocate memory for better performance.
 	slaves := make([]*sql.DB, 0, len(slaveDSNs))
 	for _, dsn := range slaveDSNs {
 		slave, err := sql.Open("postgres", dsn)
@@ -61,28 +60,28 @@ func New(masterDSN string, slaveDSNs []string, opts *Options) (*DB, error) {
 		slaves = append(slaves, slave)
 	}
 
-	// Создаем balancer.
+	// Create balancer.
 	balancer := newBalancer(len(slaveDSNs))
 
 	return &DB{Master: master, Slaves: slaves, balancer: balancer}, nil
 }
 
-// QueryContext выполняет запрос на slave если доступен, иначе на master.
+// QueryContext executes a query on a slave if available, otherwise on the master.
 func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
 	return db.selectDB().QueryContext(ctx, query, args...)
 }
 
-// QueryRowContext выполняет запрос на slave если доступен, иначе на master.
+// QueryRowContext executes a single-row query on a slave if available, otherwise on the master.
 func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
 	return db.selectDB().QueryRowContext(ctx, query, args...)
 }
 
-// ExecContext выполняет команду на master базе данных.
+// ExecContext executes a command on the master database.
 func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
 	return db.Master.ExecContext(ctx, query, args...)
 }
 
-// ExecWithRetry выполняет команду с стратегией повторных попыток.
+// ExecWithRetry executes a command with a retry strategy.
 func (db *DB) ExecWithRetry(
 	ctx context.Context,
 	strategy retry.Strategy,
@@ -100,7 +99,7 @@ func (db *DB) ExecWithRetry(
 	return res, err
 }
 
-// QueryWithRetry выполняет запрос с стратегией повторных попыток.
+// QueryWithRetry executes a query with a retry strategy.
 func (db *DB) QueryWithRetry(
 	ctx context.Context,
 	strategy retry.Strategy,
@@ -125,7 +124,7 @@ func (db *DB) QueryWithRetry(
 	return rows, err
 }
 
-// QueryRowWithRetry выполняет запрос с стратегией повторных попыток.
+// QueryRowWithRetry executes a single-row query with a retry strategy.
 func (db *DB) QueryRowWithRetry(
 	ctx context.Context,
 	strategy retry.Strategy,
@@ -142,11 +141,11 @@ func (db *DB) QueryRowWithRetry(
 	return row, err
 }
 
-// BatchExec выполняет несколько запросов пакетно асинхронно.
+// BatchExec executes multiple queries asynchronously in a batch.
 func (db *DB) BatchExec(ctx context.Context, in <-chan string) {
 	go func() {
 		for query := range in {
-			_, _ = db.ExecContext(ctx, query) // Ошибки можно логировать
+			_, _ = db.ExecContext(ctx, query) // Errors can be logged if needed.
 			select {
 			case <-ctx.Done():
 				return
@@ -156,10 +155,10 @@ func (db *DB) BatchExec(ctx context.Context, in <-chan string) {
 	}()
 }
 
-// selectDB возвращает базу для выполнения запроса: slave (round-robin) или master.
+// selectDB returns a database for query execution: slave (round-robin) or master.
 func (db *DB) selectDB() *sql.DB {
 	if len(db.Slaves) > 0 {
-		// Выбираем slave при помощи balancer.
+		// Select a slave using balancer.
 		return db.Slaves[db.balancer.index()]
 	}
 

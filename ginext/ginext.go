@@ -1,26 +1,26 @@
-// Package ginext предоставляет расширения для веб-фреймворка Gin.
+// Package ginext provides extensions for the Gin web framework.
 package ginext
 
 import (
 	"github.com/gin-gonic/gin"
 )
 
-// Аналоги библиотечных типов
+// Type aliases for convenience
 type Context = gin.Context
 type HandlerFunc = gin.HandlerFunc
 type H = gin.H
 
-// Engine расширяет стандартный Gin Engine.
+// Engine extends the standard Gin Engine.
 type Engine struct {
 	*gin.Engine
 }
 
-// RouterGroup позволяет объединять хэндлеры в группы
+// RouterGroup groups related routes together.
 type RouterGroup struct {
 	*gin.RouterGroup
 }
 
-// New создает новый экземпляр Engine.
+// New creates a new Engine instance with the specified Gin mode.
 func New(ginMode string) *Engine {
 	if ginMode == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -30,17 +30,17 @@ func New(ginMode string) *Engine {
 	return &Engine{gin.New()}
 }
 
-// Run запуск сервера
+// Run starts the Gin server.
 func (e *Engine) Run(addr ...string) error {
 	return e.Engine.Run(addr...)
 }
 
-// Group используется для создания группы роутов
+// Group creates a new route group.
 func (e *Engine) Group(relativePath string, handlers ...HandlerFunc) *RouterGroup {
 	return &RouterGroup{e.Engine.Group(relativePath, handlers...)}
 }
 
-// Use используется для установки middleware
+// Use attaches middleware to the Engine.
 func (e *Engine) Use(middleware ...HandlerFunc) {
 	e.Engine.Use(middleware...)
 }
@@ -53,7 +53,7 @@ func (e *Engine) LoadHTMLGlob(pattern string) {
 	e.Engine.LoadHTMLGlob(pattern)
 }
 
-// Стандартные middleware
+// Default middleware
 func Logger() HandlerFunc {
 	return gin.Logger()
 }
@@ -62,8 +62,7 @@ func Recovery() HandlerFunc {
 	return gin.Recovery()
 }
 
-// HTTP-методы для Engine
-
+// HTTP methods for Engine
 func (e *Engine) GET(relativePath string, handlers ...HandlerFunc) {
 	e.Engine.GET(relativePath, handlers...)
 }
@@ -92,8 +91,7 @@ func (e *Engine) HEAD(relativePath string, handlers ...HandlerFunc) {
 	e.Engine.HEAD(relativePath, handlers...)
 }
 
-// HTTP-методы для для RouterGroup
-
+// HTTP methods for RouterGroup
 func (g *RouterGroup) GET(relativePath string, handlers ...HandlerFunc) {
 	g.RouterGroup.GET(relativePath, handlers...)
 }
