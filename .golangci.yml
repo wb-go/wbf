@@ -1,3 +1,5 @@
+version: "2"
+
 run:
   timeout: 2m
   tests: false
@@ -9,9 +11,6 @@ linters:
     - staticcheck
     - gosimple
     - unused
-    - structcheck
-    - varcheck
-    - deadcode
     - gofmt
     - goimports
     - revive
@@ -36,7 +35,6 @@ linters:
     - forbidigo
     - lll
     - stylecheck
-    - scopelint
     - gosec
     - asasalint
     - bodyclose
@@ -61,18 +59,18 @@ linters:
     - tparallel
     - wastedassign
     - zerologlint
-  disables:
-    - wrapcheck
+
+  settings:
+    gocyclo:
+      min-complexity: 15
+    lll:
+      line-length: 120
+
+formatters:
+  settings:
+    gofmt:
+      simplify: true
 
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
-
-linters-settings:
-  gofmt:
-    simplify: true
-  gocyclo:
-    min-complexity: 15
-  lll:
-    line-length: 120 
