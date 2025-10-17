@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"time"
 
+	// Register PostgreSQL driver for database/sql.
 	_ "github.com/lib/pq"
 
 	"github.com/wb-go/wbf/retry"
