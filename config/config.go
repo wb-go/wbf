@@ -115,6 +115,16 @@ func (c *Config) GetInt(key string) int {
 	return c.v.GetInt(key)
 }
 
+// GetInt32 получает целочисленное значение int32 из конфигурации по ключу.
+func (c *Config) GetInt32(key string) int32 {
+	return c.v.GetInt32(key)
+}
+
+// GetInt64 получает целочисленное значение int64 из конфигурации по ключу.
+func (c *Config) GetInt64(key string) int64 {
+	return c.v.GetInt64(key)
+}
+
 // GetBool получает логическое значение из конфигурации по ключу.
 func (c *Config) GetBool(key string) bool {
 	return c.v.GetBool(key)
