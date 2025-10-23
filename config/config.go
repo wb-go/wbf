@@ -12,6 +12,19 @@ import (
 	"github.com/spf13/viper"
 )
 
+var (
+	// ErrShortFlagLength возвращается, если короткий флаг содержит более одного символа.
+	ErrShortFlagLength = errors.New("short flag must be one character")
+	// ErrUnsupportedFlag возвращается, если тип флага не поддерживается.
+	ErrUnsupportedFlag = errors.New("unsupported flag type")
+	// ErrFlagNotFound возвращается, если указанный флаг не найден.
+	ErrFlagNotFound = errors.New("flag not found")
+	// ErrLoadEnvFile возвращается при ошибке загрузки .env файла.
+	ErrLoadEnvFile = errors.New("failed to load env file")
+	// ErrLoadConfigFile возвращается при ошибке загрузки файла конфигурации.
+	ErrLoadConfigFile = errors.New("failed to load config file")
+)
+
 // Config оборачивает экземпляр конфигурации Viper.
 type Config struct {
 	v *viper.Viper
@@ -23,40 +36,41 @@ func New() *Config {
 	return &Config{v: v}
 }
 
-// Load читает конфигурацию из указанного файла и .env файла, если передан.
-// Включает поддержку переменных окружения и флагов командной строки.
-func (c *Config) Load(configFilePath, envFilePath, envPrefix string) error {
-	if envFilePath != "" {
-		err := godotenv.Load(envFilePath)
-		if err != nil {
-			return fmt.Errorf("failed to load .env file %s: %w", envFilePath, err)
+// LoadEnvFiles загружает один или несколько файлов .env в os.Environ().
+func (c *Config) LoadEnvFiles(paths ...string) error {
+	for _, path := range paths {
+		if err := godotenv.Load(path); err != nil {
+			return fmt.Errorf("%w %s: %w", ErrLoadEnvFile, path, err)
 		}
 	}
+	return nil
+}
 
-	c.v.AutomaticEnv()
+// LoadConfigFiles загружает и объединяет несколько файлов конфигурации.
+func (c *Config) LoadConfigFiles(paths ...string) error {
+	for _, cfgPath := range paths {
+		c.v.SetConfigFile(cfgPath)
+		if err := c.v.MergeInConfig(); err != nil {
+			return fmt.Errorf("%w %s: %w", ErrLoadConfigFile, cfgPath, err)
+		}
+	}
+	return nil
+}
 
+// EnableEnv включает автоматическую загрузку переменных окружения.
+// envPrefix (если задан) используется как префикс для всех ключей.
+func (c *Config) EnableEnv(envPrefix string) {
+	c.v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	if envPrefix != "" {
 		c.v.SetEnvPrefix(envPrefix)
 	}
-
-	c.v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	c.v.SetConfigFile(configFilePath)
-
-	err := c.v.ReadInConfig()
-	if err != nil {
-		return fmt.Errorf("failed to read config %s: %w", configFilePath, err)
-	}
-
-	c.v.BindPFlags(pflag.CommandLine)
-
-	return nil
+	c.v.AutomaticEnv()
 }
 
 // DefineFlag позволяет объявлять флаги (короткий и длинный) и привязывать их к ключу конфигурации.
 func (c *Config) DefineFlag(short, long, configKey string, defaultValue any, usage string) error {
-	if len([]rune(short)) > 1 {
-		return errors.New("no more than one character is required")
+	if len(short) > 1 {
+		return fmt.Errorf("%w: got %s", ErrShortFlagLength, short)
 	}
 	switch v := defaultValue.(type) {
 	case string:
@@ -73,16 +87,22 @@ func (c *Config) DefineFlag(short, long, configKey string, defaultValue any, usa
 		pflag.IntSliceP(long, short, v, usage)
 	case time.Duration:
 		pflag.DurationP(long, short, v, usage)
+	default:
+		return fmt.Errorf("%w: %T", ErrUnsupportedFlag, v)
 	}
-	if err := c.v.BindPFlag(configKey, pflag.Lookup(long)); err != nil {
-		return err
+
+	flag := pflag.Lookup(long)
+	if flag == nil {
+		return fmt.Errorf("%w %q", ErrFlagNotFound, long)
 	}
-	return nil
+
+	return c.v.BindPFlag(configKey, flag)
 }
 
 // ParseFlags парсит объявленные флаги.
-func (c *Config) ParseFlags() {
+func (c *Config) ParseFlags() error {
 	pflag.Parse()
+	return c.v.BindPFlags(pflag.CommandLine)
 }
 
 // GetString получает строковое значение из конфигурации по ключу.
@@ -93,6 +113,16 @@ func (c *Config) GetString(key string) string {
 // GetInt получает целочисленное значение из конфигурации по ключу.
 func (c *Config) GetInt(key string) int {
 	return c.v.GetInt(key)
+}
+
+// GetInt32 получает целочисленное значение int32 из конфигурации по ключу.
+func (c *Config) GetInt32(key string) int32 {
+	return c.v.GetInt32(key)
+}
+
+// GetInt64 получает целочисленное значение int64 из конфигурации по ключу.
+func (c *Config) GetInt64(key string) int64 {
+	return c.v.GetInt64(key)
 }
 
 // GetBool получает логическое значение из конфигурации по ключу.
@@ -128,6 +158,17 @@ func (c *Config) GetIntSlice(key string) []int {
 // Unmarshal позволяет распаковать конфигурацию в структуру.
 func (c *Config) Unmarshal(rawVal any, opts ...viper.DecoderConfigOption) error {
 	return c.v.Unmarshal(rawVal, opts...)
+}
+
+// UnmarshalKey позволяет распаковать часть конфигурации по ключу в структуру.
+func (c *Config) UnmarshalKey(key string, rawVal any, opts ...viper.DecoderConfigOption) error {
+	return c.v.UnmarshalKey(key, rawVal, opts...)
+}
+
+// UnmarshalExact позволяет строго распаковать конфигурацию в структуру.
+// Вернёт ошибку, если в файле есть ключи, которых нет в структуре.
+func (c *Config) UnmarshalExact(rawVal any, opts ...viper.DecoderConfigOption) error {
+	return c.v.UnmarshalExact(rawVal, opts...)
 }
 
 // SetDefault устанавливает значение по умолчанию для ключа.

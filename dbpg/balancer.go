@@ -4,7 +4,7 @@ import "sync"
 
 type balancer struct {
 	idx int
-	max int // Кол-во slaves
+	max int // Number of slave connections.
 
 	mu *sync.Mutex
 }
@@ -13,7 +13,7 @@ func newBalancer(max int) *balancer {
 	return &balancer{
 		idx: 0,
 		max: max,
-		mu:  new(sync.Mutex),
+		mu:  &sync.Mutex{},
 	}
 }
 
@@ -27,6 +27,6 @@ func (b *balancer) index() int {
 
 	res := b.idx
 	b.idx = (b.idx + 1) % b.max
-	
+
 	return res
 }

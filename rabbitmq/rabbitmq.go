@@ -1,5 +1,5 @@
-// Package rabbitmq предоставляет высокоуровневую обертку над библиотекой amqp091-go
-// для работы с RabbitMQ. Пока только базовая функциональность :).
+// Package rabbitmq provides a high-level wrapper over amqp091-go
+// for working with RabbitMQ. Currently supports only basic functionality.
 package rabbitmq
 
 import (
@@ -11,76 +11,82 @@ import (
 	"github.com/wb-go/wbf/retry"
 )
 
+// Connection is an alias for amqp091.Connection.
 type Connection = amqp091.Connection
+
+// Channel is an alias for amqp091.Channel.
 type Channel = amqp091.Channel
+
+// Queue is an alias for amqp091.Queue.
 type Queue = amqp091.Queue
 
+// QueueManager manages queues on a specific AMQP channel.
 type QueueManager struct {
 	channel *Channel
 }
 
+// QueueConfig holds configuration for a queue.
 type QueueConfig struct {
-	Durable    bool          // Если true, то очередь сохраняется при перезапуске RabbitMQ
-	AutoDelete bool          // Если true, то очередь удаляется при отсутствии подписчиков
-	Exclusive  bool          // Если true, то очередь доступна только одному соединению
-	NoWait     bool          // Если true, то не ждем подтверждения от сервера
-	Args       amqp091.Table // Доп аргументы
+	Durable    bool          // If true, the queue is persisted on RabbitMQ restart.
+	AutoDelete bool          // If true, the queue is deleted when unused.
+	Exclusive  bool          // If true, the queue is exclusive to a single connection.
+	NoWait     bool          // If true, the server will not send a confirmation.
+	Args       amqp091.Table // Additional arguments.
 }
 
+// Publisher represents a message publisher for a specific exchange.
 type Publisher struct {
 	channel  *Channel
 	exchange string
 }
 
+// PublishingOptions contains optional parameters for publishing messages.
 type PublishingOptions struct {
-	Mandatory  bool          // Если true, то сообщение будет возвращено при отсутствии очереди
-	Immediate  bool          // Если true, то сообщение будет возвращено при отсутствии потребителя
-	Expiration time.Duration // TTL сообщения
-	Headers    amqp091.Table // Заголовки
+	Mandatory  bool          // If true, message is returned if there is no matching queue.
+	Immediate  bool          // If true, message is returned if there is no active consumer.
+	Expiration time.Duration // Message TTL.
+	Headers    amqp091.Table // Message headers.
 }
 
+// ConsumerConfig holds configuration for a consumer.
 type ConsumerConfig struct {
-	Queue     string        // Имя очереди
-	Consumer  string        // Идентификатор потребителя
-	AutoAck   bool          // Автоматическое подтверждение сообщений
-	Exclusive bool          // Эксклюзивный доступ к очереди
-	NoLocal   bool          // Не поддерживается в RabbitMQ
-	NoWait    bool          // Если true, то не ждем подтверждения от сервера
-	Args      amqp091.Table // Доп аргументы
+	Queue     string        // Queue name.
+	Consumer  string        // Consumer tag.
+	AutoAck   bool          // Automatically acknowledge messages.
+	Exclusive bool          // Exclusive access to the queue.
+	NoLocal   bool          // Not supported in RabbitMQ.
+	NoWait    bool          // If true, the server will not send a confirmation.
+	Args      amqp091.Table // Additional arguments.
 }
 
+// Consumer represents a RabbitMQ consumer.
 type Consumer struct {
 	channel *Channel
 	config  *ConsumerConfig
 }
 
+// Exchange represents a RabbitMQ exchange.
 type Exchange struct {
-	name       string        // Название обменника
-	kind       string        // Тип обменника: direct, fanout, topic, headers
-	Durable    bool          // Усли true, то обменник сохранится при перезагрузке сервера
-	AutoDelete bool          // Если true, то обменник удалится когда все очереди отвяжутся
-	Internal   bool          // Усли true, то обменник нельзя использовать для публикации напрямую
-	NoWait     bool          // Если true, то не ждем подтверждения от сервера
-	Args       amqp091.Table // Доп аргументы
+	name       string        // Exchange name.
+	kind       string        // Exchange type: direct, fanout, topic, headers.
+	Durable    bool          // If true, exchange is persisted after restart.
+	AutoDelete bool          // If true, exchange is deleted when unused.
+	Internal   bool          // If true, exchange cannot be published directly.
+	NoWait     bool          // If true, no server confirmation is expected.
+	Args       amqp091.Table // Additional arguments.
 }
 
-// Name возвращает название обменника
+// Name returns the exchange name.
 func (e *Exchange) Name() string {
 	return e.name
 }
 
-// Kind возвращает тип обменника
+// Kind returns the exchange type.
 func (e *Exchange) Kind() string {
-	return e.name
+	return e.kind
 }
 
-/*
-NewExchange создате новый экземпляр Exchange
-
-name - название обменника,
-
-kind - тип обменника: direct, fanout, topic, headers
-*/
+// NewExchange creates a new Exchange instance.
 func NewExchange(name, kind string) *Exchange {
 	return &Exchange{
 		name: name,
@@ -88,13 +94,7 @@ func NewExchange(name, kind string) *Exchange {
 	}
 }
 
-/*
-NewConsumer создает новый экземпляр Consumer.
-
-ch - канал AMQP,
-
-config - конфигурация потребителя.
-*/
+// NewConsumer creates a new Consumer instance.
 func NewConsumer(ch *Channel, config *ConsumerConfig) *Consumer {
 	return &Consumer{
 		channel: ch,
@@ -102,24 +102,14 @@ func NewConsumer(ch *Channel, config *ConsumerConfig) *Consumer {
 	}
 }
 
-/*
-NewConsumerConfig создает конфигурацию потребителя с настройками по умолчанию.
-
-queue - имя очереди для подписки.
-*/
+// NewConsumerConfig creates a default ConsumerConfig.
 func NewConsumerConfig(queue string) *ConsumerConfig {
 	return &ConsumerConfig{
 		Queue: queue,
 	}
 }
 
-/*
-NewPublisher создает новый экземпляр Publisher.
-
-ch - канал AMQP,
-
-routingKey - "адрес" для доставки сообщений.
-*/
+// NewPublisher creates a new Publisher instance.
 func NewPublisher(ch *Channel, exchange string) *Publisher {
 	return &Publisher{
 		channel:  ch,
@@ -127,26 +117,14 @@ func NewPublisher(ch *Channel, exchange string) *Publisher {
 	}
 }
 
-/*
-NewQueueManager создает новый экземпляр QueueManager.
-
-channel - канал AMQP для управления очередями.
-*/
+// NewQueueManager creates a new QueueManager instance.
 func NewQueueManager(channel *Channel) *QueueManager {
 	return &QueueManager{
 		channel: channel,
 	}
 }
 
-/*
-Connect устанавливает соединение с RabbitMQ с автоматическими повторами.
-
-url - строка подключения,
-
-retries - количество попыток,
-
-pause - задержка между попытками.
-*/
+// Connect establishes a connection to RabbitMQ with retry attempts.
 func Connect(url string, retries int, pause time.Duration) (*Connection, error) {
 	var conn *amqp091.Connection
 	var err error
@@ -160,14 +138,10 @@ func Connect(url string, retries int, pause time.Duration) (*Connection, error) 
 		time.Sleep(pause)
 	}
 
-	return nil, fmt.Errorf("failed to connect after %d attempts: %v", retries, err)
+	return nil, fmt.Errorf("failed to connect after %d attempts: %w", retries, err)
 }
 
-/*
-BindToChannel создает обменник.
-
-ch - канал AMQP.
-*/
+// BindToChannel declares an exchange on the given AMQP channel.
 func (e *Exchange) BindToChannel(ch *Channel) error {
 	return ch.ExchangeDeclare(
 		e.name,
@@ -180,13 +154,7 @@ func (e *Exchange) BindToChannel(ch *Channel) error {
 	)
 }
 
-/*
-DeclareQueue объявляет очередь с указанным именем и параметрами.
-
-name - имя очереди,
-
-config - необязательные параметры конфигурации.
-*/
+// DeclareQueue declares a queue with a given name and configuration.
 func (qm *QueueManager) DeclareQueue(name string, config ...QueueConfig) (Queue, error) {
 	cfg := &QueueConfig{}
 
@@ -204,17 +172,7 @@ func (qm *QueueManager) DeclareQueue(name string, config ...QueueConfig) (Queue,
 	)
 }
 
-/*
-Publish публикует сообщение с заданным routingKey в exchange, связанный с Publisher.
-
-body - тело сообщения,
-
-exchange - точка обмена,
-
-contentType - тип контента,
-
-options - необязательные параметры публикации.
-*/
+// Publish sends a message with a given routing key to the exchange associated with Publisher.
 func (p *Publisher) Publish(body []byte, routingKey, contentType string, options ...PublishingOptions) error {
 	var option PublishingOptions
 
@@ -241,28 +199,19 @@ func (p *Publisher) Publish(body []byte, routingKey, contentType string, options
 	)
 }
 
-/*
-PublishWithRetry пытается опубликовать сообщение с заданным routingKey в exchange, связанный с Publisher с ретраями в случае ошибки.
-
-body - тело сообщения,
-
-exchange - точка обмена,
-
-contentType - тип контента,
-
-options - необязательные параметры публикации.
-*/
-func (p *Publisher) PublishWithRetry(body []byte, routingKey, contentType string, strategy retry.Strategy, options ...PublishingOptions) error {
+// PublishWithRetry publishes a message with retry attempts on failure.
+func (p *Publisher) PublishWithRetry(
+	body []byte,
+	routingKey, contentType string,
+	strategy retry.Strategy,
+	options ...PublishingOptions,
+) error {
 	return retry.Do(func() error {
 		return p.Publish(body, routingKey, contentType, options...)
 	}, strategy)
 }
 
-/*
-Consume начинает потребление сообщений и отправляет их в указанный канал.
-
-msgChan - канал для получения сообщений.
-*/
+// Consume starts message consumption and sends messages into the provided channel.
 func (c *Consumer) Consume(msgChan chan []byte) error {
 	msgs, err := c.channel.Consume(
 		c.config.Queue,
@@ -294,11 +243,7 @@ func (c *Consumer) Consume(msgChan chan []byte) error {
 	return nil
 }
 
-/*
-ConsumeWithRetry пытается начать потребление сообщений и отправляет их в указанный канал с ретраями в случае ошибки.
-
-msgChan - канал для получения сообщений.
-*/
+// ConsumeWithRetry attempts to consume messages with a retry strategy on failure.
 func (c *Consumer) ConsumeWithRetry(msgChan chan []byte, strategy retry.Strategy) error {
 	return retry.Do(func() error {
 		return c.Consume(msgChan)

@@ -1,4 +1,4 @@
-// Package redis предоставляет клиент для работы с Redis.
+// Package redis provides a client wrapper for Redis operations.
 package redis
 
 import (
@@ -9,15 +9,15 @@ import (
 	"github.com/wb-go/wbf/retry"
 )
 
-// NoMatches is used for when Redis did not get any matches.
+// NoMatches is returned when Redis did not find any matching key.
 const NoMatches = redis.Nil
 
-// Client оборачивает Redis клиент.
+// Client wraps the Redis client.
 type Client struct {
 	*redis.Client
 }
 
-// New создает новый Redis клиент.
+// New creates a new Redis client.
 func New(addr, password string, db int) *Client {
 	return &Client{
 		redis.NewClient(&redis.Options{
@@ -28,21 +28,22 @@ func New(addr, password string, db int) *Client {
 	}
 }
 
-// Get получает значение по ключу из Redis.
+// Get retrieves a value by key from Redis.
 func (c *Client) Get(ctx context.Context, key string) (string, error) {
 	return c.Client.Get(ctx, key).Result()
 }
 
-// Set устанавливает значение по ключу в Redis.
+// Set stores a value by key in Redis.
 func (c *Client) Set(ctx context.Context, key string, value interface{}) error {
 	return c.Client.Set(ctx, key, value, 0).Err()
 }
 
+// SetWithExpiration stores a value with a specified expiration time.
 func (c *Client) SetWithExpiration(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
 	return c.Client.Set(ctx, key, value, expiration).Err()
 }
 
-// GetWithRetry получает значение с стратегией повторных попыток.
+// GetWithRetry retrieves a value using a retry strategy.
 func (c *Client) GetWithRetry(ctx context.Context, strategy retry.Strategy, key string) (string, error) {
 	var val string
 	err := retry.Do(func() error {
@@ -55,18 +56,18 @@ func (c *Client) GetWithRetry(ctx context.Context, strategy retry.Strategy, key 
 	return val, err
 }
 
-// SetWithRetry устанавливает значение с стратегией повторных попыток.
+// SetWithRetry stores a value using a retry strategy.
 func (c *Client) SetWithRetry(ctx context.Context, strategy retry.Strategy, key string, value interface{}) error {
 	return retry.Do(func() error {
 		return c.Set(ctx, key, value)
 	}, strategy)
 }
 
-// BatchWriter выполняет пакетную запись в Redis.
+// BatchWriter performs batched writes to Redis asynchronously.
 func (c *Client) BatchWriter(ctx context.Context, in <-chan [2]string) {
 	go func() {
 		for pair := range in {
-			_ = c.Set(ctx, pair[0], pair[1]) // Ошибки можно логировать.
+			_ = c.Set(ctx, pair[0], pair[1]) // Errors can be logged if needed.
 			select {
 			case <-ctx.Done():
 				return
@@ -76,12 +77,12 @@ func (c *Client) BatchWriter(ctx context.Context, in <-chan [2]string) {
 	}()
 }
 
-// Del удаляет значение по ключу из Redis.
+// Del removes a key from Redis.
 func (c *Client) Del(ctx context.Context, key string) error {
 	return c.Client.Del(ctx, key).Err()
 }
 
-// DelWithRetry удаляет значение из Redis со стратегией повторных попыток.
+// DelWithRetry removes a key from Redis using a retry strategy.
 func (c *Client) DelWithRetry(ctx context.Context, strategy retry.Strategy, key string) error {
 	return retry.Do(func() error {
 		return c.Del(ctx, key)

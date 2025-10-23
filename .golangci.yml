@@ -9,9 +9,6 @@ linters:
     - staticcheck
     - gosimple
     - unused
-    - structcheck
-    - varcheck
-    - deadcode
     - gofmt
     - goimports
     - revive
@@ -36,7 +33,6 @@ linters:
     - forbidigo
     - lll
     - stylecheck
-    - scopelint
     - gosec
     - asasalint
     - bodyclose
