@@ -2,6 +2,7 @@
 package retry
 
 import (
+	"context"
 	"time"
 )
 
@@ -22,6 +23,25 @@ func Do(fn func() error, strategy Strategy) error {
 			return nil
 		}
 		time.Sleep(delay)
+		delay = time.Duration(float64(delay) * strategy.Backoff)
+	}
+	return err
+}
+
+// DoContext выполняет функцию с заданной стратегией повторных попыток только с контекстом и завершением при gracefully shutdown
+func DoContext(ctx context.Context, strategy Strategy, fn func(context.Context) error) error {
+	delay := strategy.Delay
+	var err error
+	for i := 0; i < strategy.Attempts; i++ {
+		err = fn(ctx)
+		if err == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(delay):
+		}
 		delay = time.Duration(float64(delay) * strategy.Backoff)
 	}
 	return err
