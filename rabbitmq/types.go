@@ -41,12 +41,14 @@ type MessageHandler func(context.Context, amqp091.Delivery) error
 
 // ConsumerConfig — конфигурация потребителя.
 type ConsumerConfig struct {
-	Queue       string
-	ConsumerTag string
-	AutoAck     bool
-	Ask         AskConfig
-	Nack        NackConfig
-	Args        amqp091.Table
+	Queue         string
+	ConsumerTag   string
+	AutoAck       bool
+	Ask           AskConfig
+	Nack          NackConfig
+	Args          amqp091.Table
+	Workers       int
+	PrefetchCount int
 }
 
 type AskConfig struct {

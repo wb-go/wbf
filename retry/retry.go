@@ -29,11 +29,11 @@ func Do(fn func() error, strategy Strategy) error {
 }
 
 // DoContext выполняет функцию с заданной стратегией повторных попыток только с контекстом и завершением при gracefully shutdown
-func DoContext(ctx context.Context, strategy Strategy, fn func(context.Context) error) error {
+func DoContext(ctx context.Context, strategy Strategy, fn func() error) error {
 	delay := strategy.Delay
 	var err error
 	for i := 0; i < strategy.Attempts; i++ {
-		err = fn(ctx)
+		err = fn()
 		if err == nil {
 			return nil
 		}

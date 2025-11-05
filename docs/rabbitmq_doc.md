@@ -119,6 +119,8 @@ type ConsumerConfig struct {
 	Ask AskConfig // настройки Ask (Multiple)
 	Nack NackConfig // настройки Nack (Multiple, Requeue)
 	Args amqp091.Table // метаданные для rabbit
+	Workers       int  // количество воркеров 
+	PrefetchCount int // количество сообщений на воркер
 }
 ```
 
