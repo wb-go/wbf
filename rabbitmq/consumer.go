@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/rabbitmq/amqp091-go"
+
 	"github.com/wb-go/wbf/zlog"
 )
 
@@ -56,7 +57,9 @@ func (c *Consumer) consumeOnce(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get channel: %w", err)
 	}
-	defer ch.Close()
+	defer func(ch *amqp091.Channel) {
+		_ = ch.Close()
+	}(ch)
 
 	if c.config.PrefetchCount > 0 {
 		if err := ch.Qos(c.config.PrefetchCount, 0, false); err != nil {
