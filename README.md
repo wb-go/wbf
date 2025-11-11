@@ -85,6 +85,21 @@ err := retry.Do(func() error {
     return nil
 }, retry.Strategy{Attempts: 3, Delay: time.Second, Backoff: 2})
 ```
+а так же
+
+```go
+ctx := context.Background()
+err := retry.DoContext(ctx, retry.Strategy{Attempts: 3, Delay: time.Second, Backoff: 2},
+    func(context.Context) error {
+	//ваш код
+	retrun nil
+})
+```
+
+
+### rabbitmq
+
+Описание и документация [rabbitmq_doc.md](docs/rabbitmq_doc.md)
 
 ## TODO
   * Написать тесты
