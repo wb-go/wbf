@@ -1,8 +1,8 @@
+// Package rabbitmq это обертка над github.com/rabbitmq/amqp091-go
 package rabbitmq
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -12,6 +12,12 @@ import (
 	"github.com/rabbitmq/amqp091-go"
 )
 
+const (
+	defaultConnectTimeout = 10 * time.Second
+	defaultHeartbeat      = 10 * time.Second
+)
+
+// RabbitClient основная структура клиента.
 type RabbitClient struct {
 	config ClientConfig
 	conn   *amqp091.Connection
@@ -22,15 +28,16 @@ type RabbitClient struct {
 	closed atomic.Bool
 }
 
+// NewClient конструктор RabbitClient.
 func NewClient(cfg ClientConfig) (*RabbitClient, error) {
 	if cfg.URL == "" {
-		return nil, errors.New("rabbitmq URL is required")
+		return nil, ErrMissingURL
 	}
 	if cfg.ConnectTimeout == 0 {
-		cfg.ConnectTimeout = 10 * time.Second
+		cfg.ConnectTimeout = defaultConnectTimeout
 	}
 	if cfg.Heartbeat == 0 {
-		cfg.Heartbeat = 10 * time.Second
+		cfg.Heartbeat = defaultHeartbeat
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -107,7 +114,7 @@ func (c *RabbitClient) reconnectLoop() {
 	}
 }
 
-// GetChannel возвращает новый канал
+// GetChannel возвращает новый канал.
 func (c *RabbitClient) GetChannel() (*amqp091.Channel, error) {
 	if c.closed.Load() {
 		return nil, ErrClientClosed
@@ -124,6 +131,7 @@ func (c *RabbitClient) GetChannel() (*amqp091.Channel, error) {
 	return conn.Channel()
 }
 
+// Close закрываем соединение.
 func (c *RabbitClient) Close() error {
 	if !c.closed.CompareAndSwap(false, true) {
 		return nil
@@ -158,7 +166,8 @@ func (c *RabbitClient) backoffWait(ctx context.Context, delay time.Duration) boo
 }
 
 // DeclareExchange объявляет exchange.
-func (c *RabbitClient) DeclareExchange(name, kind string, durable, autoDelete, internal bool, args amqp091.Table) error {
+func (c *RabbitClient) DeclareExchange(name, kind string, durable, autoDelete,
+	internal bool, args amqp091.Table) error {
 	ch, err := c.GetChannel()
 	if err != nil {
 		return err

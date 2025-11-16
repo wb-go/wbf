@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
-
 	"github.com/wb-go/wbf/retry"
 )
 
@@ -22,6 +21,7 @@ type ClientConfig struct {
 // PublishOption — функциональная опция для публикации.
 type PublishOption func(*amqp091.Publishing)
 
+// WithExpiration - опция для указания время истечения.
 func WithExpiration(d time.Duration) PublishOption {
 	return func(p *amqp091.Publishing) {
 		if d > 0 {
@@ -30,6 +30,7 @@ func WithExpiration(d time.Duration) PublishOption {
 	}
 }
 
+// WithHeaders - опция для указания заголовков.
 func WithHeaders(headers amqp091.Table) PublishOption {
 	return func(p *amqp091.Publishing) {
 		p.Headers = headers
@@ -51,10 +52,12 @@ type ConsumerConfig struct {
 	PrefetchCount int
 }
 
+// AskConfig - настройки Ask.
 type AskConfig struct {
 	Multiple bool
 }
 
+// NackConfig - настройки Nack.
 type NackConfig struct {
 	Multiple bool
 	Requeue  bool

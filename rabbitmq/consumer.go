@@ -2,21 +2,21 @@ package rabbitmq
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/rabbitmq/amqp091-go"
-
 	"github.com/wb-go/wbf/zlog"
 )
 
+// Consumer - обертка над RabbitMQ-клиентом для получения сообщений из обменника.
 type Consumer struct {
 	client  *RabbitClient
 	config  ConsumerConfig
 	handler MessageHandler
 }
 
+// NewConsumer конструктор Consumer.
 func NewConsumer(client *RabbitClient, cfg ConsumerConfig, handler MessageHandler) *Consumer {
 	if cfg.ConsumerTag == "" {
 		cfg.ConsumerTag = "consumer"
@@ -31,6 +31,7 @@ func NewConsumer(client *RabbitClient, cfg ConsumerConfig, handler MessageHandle
 	}
 }
 
+// Start запуск чтения сообщений.
 func (c *Consumer) Start(ctx context.Context) error {
 	zlog.Logger.Info().Msgf("Starting consumer %s", c.config.ConsumerTag)
 	for {
@@ -52,6 +53,7 @@ func (c *Consumer) Start(ctx context.Context) error {
 		}
 	}
 }
+
 func (c *Consumer) consumeOnce(ctx context.Context) error {
 	ch, err := c.client.GetChannel()
 	if err != nil {
@@ -105,12 +107,35 @@ func (c *Consumer) consumeOnce(ctx context.Context) error {
 		if !ok {
 			cancel()
 			wg.Wait()
-			return errors.New("message channel closed unexpectedly")
+			return ErrChannelClosedUnexpectedly
 		}
 	}
 
 	wg.Wait()
 	return nil
+}
+
+func (c *Consumer) processDelivery(ctx context.Context, msg amqp091.Delivery) {
+	if c.config.AutoAck {
+		if err := c.handler(ctx, msg); err != nil {
+			zlog.Logger.Warn().
+				Err(err).
+				Str("consumer", c.config.ConsumerTag).
+				Msg("AutoAck handler failed")
+		}
+		return
+	}
+
+	// Режим ручного подтверждения
+	if err := c.handler(ctx, msg); err != nil {
+		if nackErr := msg.Nack(c.config.Nack.Multiple, c.config.Nack.Requeue); nackErr != nil {
+			zlog.Logger.Error().Err(nackErr).Msg("NACK failed")
+		}
+	} else {
+		if ackErr := msg.Ack(c.config.Ask.Multiple); ackErr != nil {
+			zlog.Logger.Error().Err(ackErr).Msg("ACK failed")
+		}
+	}
 }
 
 func (c *Consumer) worker(ctx context.Context, msgs <-chan amqp091.Delivery) {
@@ -122,25 +147,7 @@ func (c *Consumer) worker(ctx context.Context, msgs <-chan amqp091.Delivery) {
 			if !ok {
 				return
 			}
-
-			if c.config.AutoAck {
-				// В режиме AutoAck не нужно подтверждать
-				if err := c.handler(ctx, msg); err != nil {
-					zlog.Logger.Warn().Err(err).Str("consumer", c.config.ConsumerTag).Msg("AutoAck handler failed")
-				}
-			} else {
-				if err := c.handler(ctx, msg); err != nil {
-					// NACK с настройками
-					if nackErr := msg.Nack(c.config.Nack.Multiple, c.config.Nack.Requeue); nackErr != nil {
-						zlog.Logger.Error().Err(nackErr).Msg("NACK failed")
-					}
-				} else {
-					// ACK с настройками
-					if ackErr := msg.Ack(c.config.Ask.Multiple); ackErr != nil {
-						zlog.Logger.Error().Err(ackErr).Msg("ACK failed")
-					}
-				}
-			}
+			c.processDelivery(ctx, msg)
 		}
 	}
 }
