@@ -28,7 +28,7 @@ func (p *Publisher) Publish(
 	routingKey string,
 	opts ...PublishOption,
 ) error {
-	return retry.DoContext(ctx, p.client.config.PublishRetry, func(ctx context.Context) error {
+	return retry.DoContext(ctx, p.client.config.PublishRetry, func() error {
 		ch, err := p.client.GetChannel()
 		if err != nil {
 			return err
