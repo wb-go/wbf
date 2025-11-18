@@ -86,7 +86,6 @@ func (c *Consumer) consumeOnce(ctx context.Context) error {
 	defer cancel()
 
 	var wg sync.WaitGroup
-
 	for i := 0; i < c.config.Workers; i++ {
 		wg.Add(1)
 		go func() {
@@ -94,6 +93,7 @@ func (c *Consumer) consumeOnce(ctx context.Context) error {
 			c.worker(workerCtx, msgs)
 		}()
 	}
+
 	select {
 	case <-ctx.Done():
 		cancel()
@@ -103,16 +103,7 @@ func (c *Consumer) consumeOnce(ctx context.Context) error {
 		cancel()
 		wg.Wait()
 		return ErrClientClosed
-	case _, ok := <-msgs:
-		if !ok {
-			cancel()
-			wg.Wait()
-			return ErrChannelClosedUnexpectedly
-		}
 	}
-
-	wg.Wait()
-	return nil
 }
 
 func (c *Consumer) processDelivery(ctx context.Context, msg amqp091.Delivery) {
