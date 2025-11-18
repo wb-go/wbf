@@ -1,7 +1,9 @@
+// Package rabbitmq это обертка над github.com/rabbitmq/amqp091-go
 package rabbitmq
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
@@ -25,7 +27,7 @@ type PublishOption func(*amqp091.Publishing)
 func WithExpiration(d time.Duration) PublishOption {
 	return func(p *amqp091.Publishing) {
 		if d > 0 {
-			p.Expiration = d.Truncate(time.Millisecond).String()
+			p.Expiration = fmt.Sprintf("%d", d.Milliseconds())
 		}
 	}
 }

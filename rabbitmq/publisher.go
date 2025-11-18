@@ -23,6 +23,11 @@ func NewPublisher(client *RabbitClient, exchange, contentType string) *Publisher
 	}
 }
 
+// GetExchangeName - Получение названия Exchang.
+func (p *Publisher) GetExchangeName() string {
+	return p.exchange
+}
+
 // Publish - отправка сообщения в обменник.
 func (p *Publisher) Publish(
 	ctx context.Context,
