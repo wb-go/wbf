@@ -101,7 +101,7 @@ err := retry.Do(func() error {
 ```go
 ctx := context.Background()
 err := retry.DoContext(ctx, retry.Strategy{Attempts: 3, Delay: time.Second, Backoff: 2},
-    func(context.Context) error {
+    func() error {
 	//ваш код
 	retrun nil
 })
