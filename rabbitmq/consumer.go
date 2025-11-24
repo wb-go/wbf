@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/rabbitmq/amqp091-go"
-
 	"github.com/wb-go/wbf/zlog"
 )
 

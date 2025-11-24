@@ -164,3 +164,40 @@ func (db *DB) selectDB() *sql.DB {
 
 	return db.Master
 }
+
+// BeginTx starts a transaction on the master database.
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	return db.Master.BeginTx(ctx, opts)
+}
+
+// BeginTxWithRetry starts a transaction with a retry strategy on the master database.
+func (db *DB) BeginTxWithRetry(
+	ctx context.Context,
+	strategy retry.Strategy,
+	opts *sql.TxOptions,
+) (*sql.Tx, error) {
+	var tx *sql.Tx
+	err := retry.Do(func() error {
+		t, e := db.BeginTx(ctx, opts)
+		if e == nil {
+			tx = t
+		}
+		return e
+	}, strategy)
+	return tx, err
+}
+
+// WithTx executes a function within a transaction on the master database.
+func (db *DB) WithTx(ctx context.Context, fn func(*sql.Tx) error) error {
+	tx, err := db.Master.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
+}

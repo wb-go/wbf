@@ -1,74 +1,74 @@
+version: "2"
 run:
-  timeout: 2m
   tests: false
-
 linters:
   enable:
-    - govet
-    - errcheck
-    - staticcheck
-    - gosimple
-    - unused
-    - gofmt
-    - goimports
-    - revive
-    - gocritic
-    - ineffassign
-    - typecheck
-    - misspell
-    - unparam
-    - nakedret
-    - prealloc
-    - gocyclo
-    - dupl
-    - dogsled
-    - exportloopref
-    - goconst
-    - gocognit
-    - godot
-    - godox
-    - nolintlint
-    - whitespace
-    - forbidigo
-    - forbidigo
-    - lll
-    - stylecheck
-    - gosec
     - asasalint
     - bodyclose
+    - dogsled
+    - dupl
     - durationcheck
+    - err113
     - errorlint
     - exhaustive
     - forbidigo
-    - gci
-    - goerr113
-    - gomnd
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - godox
     - goprintffuncname
     - gosec
     - importas
+    - lll
     - makezero
+    - misspell
+    - mnd
+    - nakedret
     - nestif
     - noctx
+    - nolintlint
+    - prealloc
     - predeclared
+    - revive
     - rowserrcheck
     - sqlclosecheck
+    - staticcheck
     - testpackage
     - thelper
     - tparallel
+    - unparam
     - wastedassign
+    - whitespace
     - zerologlint
-  disables:
+  disable:
     - wrapcheck
-
+  settings:
+    gocyclo:
+      min-complexity: 15
+    lll:
+      line-length: 120
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
-
-linters-settings:
-  gofmt:
-    simplify: true
-  gocyclo:
-    min-complexity: 15
-  lll:
-    line-length: 120 
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
