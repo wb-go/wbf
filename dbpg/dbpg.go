@@ -201,3 +201,26 @@ func (db *DB) WithTx(ctx context.Context, fn func(*sql.Tx) error) error {
 
 	return tx.Commit()
 }
+
+// WithTxWithRetry executes a function within a transaction on the master database with retry strategy.
+func (db *DB) WithTxWithRetry(
+	ctx context.Context,
+	strategy retry.Strategy,
+	fn func(*sql.Tx) error,
+) error {
+	err := retry.DoContext(ctx, strategy, func() error {
+		tx, e := db.Master.BeginTx(ctx, nil)
+		if e != nil {
+			return e
+		}
+
+		e = fn(tx)
+		if e != nil {
+			_ = tx.Rollback()
+			return e
+		}
+
+		return tx.Commit()
+	})
+	return err
+}
