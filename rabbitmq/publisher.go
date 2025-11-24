@@ -4,16 +4,17 @@ import (
 	"context"
 
 	"github.com/rabbitmq/amqp091-go"
-
 	"github.com/wb-go/wbf/retry"
 )
 
+// Publisher - обертка над RabbitMQ-клиентом для публикации сообщений в обменник.
 type Publisher struct {
 	client      *RabbitClient
 	exchange    string
 	contentType string
 }
 
+// NewPublisher конструктор Publisher.
 func NewPublisher(client *RabbitClient, exchange, contentType string) *Publisher {
 	return &Publisher{
 		client:      client,
@@ -22,13 +23,19 @@ func NewPublisher(client *RabbitClient, exchange, contentType string) *Publisher
 	}
 }
 
+// GetExchangeName - Получение названия Exchang.
+func (p *Publisher) GetExchangeName() string {
+	return p.exchange
+}
+
+// Publish - отправка сообщения в обменник.
 func (p *Publisher) Publish(
 	ctx context.Context,
 	body []byte,
 	routingKey string,
 	opts ...PublishOption,
 ) error {
-	return retry.DoContext(ctx, p.client.config.PublishRetry, func(ctx context.Context) error {
+	return retry.DoContext(ctx, p.client.config.PublishRetry, func() error {
 		ch, err := p.client.GetChannel()
 		if err != nil {
 			return err
@@ -45,8 +52,8 @@ func (p *Publisher) Publish(
 		for _, opt := range opts {
 			opt(&pub)
 		}
-
-		err = ch.PublishWithContext(ctx, p.exchange, routingKey, false, false, pub) //mandatory и immediate не используются практически пока так
+		// mandatory и immediate не используются практически пока так.
+		err = ch.PublishWithContext(ctx, p.exchange, routingKey, false, false, pub)
 		if err != nil {
 			return err
 		}
