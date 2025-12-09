@@ -34,6 +34,16 @@ ch <- "INSERT ..."
 close(ch)
 ```
 
+Транзакции WithTx:
+
+```go
+err := db.WithTx(ctx, func(tx *sql.Tx) error {
+    tx.ExecContext(ctx, "INSERT ...")
+    tx.ExecContext(ctx, "UPDATE ...")
+    return nil
+})
+```
+
 #### Redis
 ```go
 client := redis.New("localhost:6379", "", 0)
@@ -47,6 +57,7 @@ go client.BatchWriter(ctx, ch)
 ch <- [2]string{"key", "value"}
 close(ch)
 ```
+
 
 #### Kafka
 ```go

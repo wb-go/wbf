@@ -6,7 +6,7 @@ repos:
         stages: [commit-msg]
         args: [--check, --commit-msg-file]
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.55.2
+    rev: v2.6.0
     hooks:
       - id: golangci-lint
         stages: [pre-commit] 

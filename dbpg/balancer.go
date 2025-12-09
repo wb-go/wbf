@@ -3,17 +3,17 @@ package dbpg
 import "sync"
 
 type balancer struct {
-	idx int
-	max int // Number of slave connections.
+	idx       int
+	maxSlaves int // Number of slave connections.
 
 	mu *sync.Mutex
 }
 
-func newBalancer(max int) *balancer {
+func newBalancer(maxSlaves int) *balancer {
 	return &balancer{
-		idx: 0,
-		max: max,
-		mu:  &sync.Mutex{},
+		idx:       0,
+		maxSlaves: maxSlaves,
+		mu:        &sync.Mutex{},
 	}
 }
 
@@ -21,12 +21,12 @@ func (b *balancer) index() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if b.max <= 0 {
+	if b.maxSlaves <= 0 {
 		return 0
 	}
 
 	res := b.idx
-	b.idx = (b.idx + 1) % b.max
+	b.idx = (b.idx + 1) % b.maxSlaves
 
 	return res
 }
