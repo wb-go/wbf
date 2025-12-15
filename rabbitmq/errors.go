@@ -12,4 +12,7 @@ var (
 	// ErrChannelClosedUnexpectedly возвращается, когда канал доставки сообщений
 	// был закрыт неожиданно (например, из-за потери соединения).
 	ErrChannelClosedUnexpectedly = errors.New("message channel closed unexpectedly")
+	// ErrWorkersTerminated возвращается, когда связь с брокером оборвалась, канал закрылся, и все воркеры вышли.
+	// Эту ошибку перехватывает Start и через какое-то время перезапускает цикл.
+	ErrWorkersTerminated = errors.New("all consumer workers have terminated")
 )
