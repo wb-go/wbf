@@ -21,9 +21,7 @@ type ZapLogger struct {
 	level  zapcore.Level
 }
 
-// NewZapLogger creates a new zap.Logger configured with JSON encoding, structured fields,
-// and the given application metadata. It supports file rotation and console output via options.
-// The logger includes caller information and automatic stack traces for errors.
+// newZapLogger creates a configured go.uber.org/zap.Logger instance.
 func newZapLogger(appName, env string, cfg *GlobalConfig) *zap.Logger {
 	encoderConfig := zapcore.EncoderConfig{
 		TimeKey:       "ts",
@@ -57,12 +55,14 @@ func newZapLogger(appName, env string, cfg *GlobalConfig) *zap.Logger {
 }
 
 // ZapAdapter implements the Logger interface using go.uber.org/zap as the underlying engine.
+// It supports structured logging, context propagation (e.g., request_id), and log rotation.
 type ZapAdapter struct {
 	zapLogger *ZapLogger
 }
 
-// NewZapAdapter creates a new logger adapter using zap.
-// It returns an error if logger initialization fails (though currently it does not).
+// NewZapAdapter creates a new zap.Logger configured with JSON encoding, structured fields,
+// and the given application metadata. It supports file rotation and console output via options.
+// The logger includes caller information and automatic stack traces for errors.
 func NewZapAdapter(appName, env string, opts ...Option) (*ZapAdapter, error) {
 	cfg := defaultConfigs()
 	for _, opt := range opts {

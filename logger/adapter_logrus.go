@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// newLogrusLogger creates a configured sirupsen/logrus.Logger instance.
 func newLogrusLogger(appName, env string, cfg *GlobalConfig) *logrus.Entry {
 	l := logrus.New()
 	l.SetOutput(cfg.GetWriter())

@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// newZerologLogger creates a configured rs/zerolog.Logger instance.
 func newZerologLogger(appName, env string, cfg *GlobalConfig) zerolog.Logger {
 	level := toZerologLevel(cfg.Level)
 	return zerolog.New(cfg.GetWriter()).Level(level).With().
