@@ -6,6 +6,18 @@ import (
 	"time"
 )
 
+// newSlogLogger creates a configured log/slog.Logger instance.
+func newSlogLogger(appName, env string, cfg *GlobalConfig) *slog.Logger {
+	level := toSlogLevel(cfg.Level)
+	handler := slog.NewJSONHandler(cfg.GetWriter(), &slog.HandlerOptions{
+		Level: level,
+	})
+	return slog.New(handler).With(
+		slog.String("service", appName),
+		slog.String("env", env),
+	)
+}
+
 // SlogAdapter implements the Logger interface using Go's standard log/slog package.
 // It supports structured logging, context propagation, and group nesting.
 type SlogAdapter struct {
@@ -20,13 +32,9 @@ func NewSlogAdapter(appName, env string, opts ...Option) *SlogAdapter {
 	for _, opt := range opts {
 		opt(cfg)
 	}
-
-	l := slog.New(slog.NewJSONHandler(cfg.GetWriter(), nil)).With(
-		slog.String("service", appName),
-		slog.String("env", env),
-	)
-
-	return &SlogAdapter{logger: l}
+	return &SlogAdapter{
+		logger: newSlogLogger(appName, env, cfg),
+	}
 }
 
 // Debug logs a message at DebugLevel with the given key-value pairs.

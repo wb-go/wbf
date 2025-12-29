@@ -7,6 +7,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+func newLogrusLogger(appName, env string, cfg *GlobalConfig) *logrus.Entry {
+	l := logrus.New()
+	l.SetOutput(cfg.GetWriter())
+	l.SetLevel(toLogrusLevel(cfg.Level))
+
+	return l.WithFields(logrus.Fields{
+		"service": appName,
+		"env":     env,
+	})
+}
+
 // LogrusAdapter implements the Logger interface using github.com/sirupsen/logrus as the underlying engine.
 // It supports structured logging and context propagation, though some features (like WithGroup)
 // have limited support due to logrus's design.
@@ -22,16 +33,9 @@ func NewLogrusAdapter(appName, env string, opts ...Option) *LogrusAdapter {
 	for _, opt := range opts {
 		opt(cfg)
 	}
-
-	l := logrus.New()
-	l.SetOutput(cfg.GetWriter())
-
-	entry := l.WithFields(logrus.Fields{
-		"service": appName,
-		"env":     env,
-	})
-
-	return &LogrusAdapter{entry: entry}
+	return &LogrusAdapter{
+		entry: newLogrusLogger(appName, env, cfg),
+	}
 }
 
 // Debug logs a message at DebugLevel with the given key-value pairs.

@@ -7,6 +7,15 @@ import (
 	"github.com/rs/zerolog"
 )
 
+func newZerologLogger(appName, env string, cfg *GlobalConfig) zerolog.Logger {
+	level := toZerologLevel(cfg.Level)
+	return zerolog.New(cfg.GetWriter()).Level(level).With().
+		Timestamp().
+		Str("service", appName).
+		Str("env", env).
+		Logger()
+}
+
 // ZerologAdapter implements the Logger interface using github.com/rs/zerolog as the underlying engine.
 // It supports structured logging, context propagation (e.g., request_id), and log rotation.
 type ZerologAdapter struct {
@@ -21,14 +30,9 @@ func NewZerologAdapter(appName, env string, opts ...Option) *ZerologAdapter {
 	for _, opt := range opts {
 		opt(cfg)
 	}
-
-	zl := zerolog.New(cfg.GetWriter()).With().
-		Timestamp().
-		Str("service", appName).
-		Str("env", env).
-		Logger()
-
-	return &ZerologAdapter{logger: zl}
+	return &ZerologAdapter{
+		logger: newZerologLogger(appName, env, cfg),
+	}
 }
 
 // Debug logs a message at DebugLevel with the given key-value pairs.

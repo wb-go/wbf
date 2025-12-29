@@ -24,7 +24,7 @@ type ZapLogger struct {
 // NewZapLogger creates a new zap.Logger configured with JSON encoding, structured fields,
 // and the given application metadata. It supports file rotation and console output via options.
 // The logger includes caller information and automatic stack traces for errors.
-func NewZapLogger(appName, env string, opts ...Option) (*ZapLogger, error) {
+func newZapLogger(appName, env string, cfg *GlobalConfig) *zap.Logger {
 	encoderConfig := zapcore.EncoderConfig{
 		TimeKey:       "ts",
 		LevelKey:      "level",
@@ -39,11 +39,6 @@ func NewZapLogger(appName, env string, opts ...Option) (*ZapLogger, error) {
 		EncodeCaller:  zapcore.ShortCallerEncoder,
 	}
 
-	cfg := defaultConfigs()
-	for _, opt := range opts {
-		opt(cfg)
-	}
-
 	zapLevel := toZapLevel(cfg.Level)
 	core := zapcore.NewCore(
 		zapcore.NewJSONEncoder(encoderConfig),
@@ -51,7 +46,7 @@ func NewZapLogger(appName, env string, opts ...Option) (*ZapLogger, error) {
 		zapLevel,
 	)
 
-	l := zap.New(core,
+	return zap.New(core,
 		zap.Fields(
 			zap.String("service", appName),
 			zap.String("env", env),
@@ -59,12 +54,6 @@ func NewZapLogger(appName, env string, opts ...Option) (*ZapLogger, error) {
 		zap.AddCaller(),
 		zap.AddStacktrace(zap.ErrorLevel),
 	)
-
-	return &ZapLogger{
-		logger: l,
-		sugar:  l.Sugar(),
-		level:  zapLevel,
-	}, nil
 }
 
 // ZapAdapter implements the Logger interface using go.uber.org/zap as the underlying engine.
@@ -75,11 +64,19 @@ type ZapAdapter struct {
 // NewZapAdapter creates a new logger adapter using zap.
 // It returns an error if logger initialization fails (though currently it does not).
 func NewZapAdapter(appName, env string, opts ...Option) (*ZapAdapter, error) {
-	zl, err := NewZapLogger(appName, env, opts...)
-	if err != nil {
-		return nil, err
+	cfg := defaultConfigs()
+	for _, opt := range opts {
+		opt(cfg)
 	}
-	return &ZapAdapter{zapLogger: zl}, nil
+
+	logger := newZapLogger(appName, env, cfg)
+	return &ZapAdapter{
+		zapLogger: &ZapLogger{
+			logger: logger,
+			sugar:  logger.Sugar(),
+			level:  toZapLevel(cfg.Level),
+		},
+	}, nil
 }
 
 // Debug logs a message at DebugLevel with the given key-value pairs.
