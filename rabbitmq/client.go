@@ -28,7 +28,9 @@ type RabbitClient struct {
 	closed atomic.Bool
 }
 
-// NewClient конструктор RabbitClient.
+// NewClient создаёт и инициализирует нового клиента RabbitMQ.
+// Проверяет обязательные параметры, устанавливает значения по умолчанию,
+// создаёт контекст и выполняет первичное подключение к брокеру.
 func NewClient(cfg ClientConfig) (*RabbitClient, error) {
 	if cfg.URL == "" {
 		return nil, ErrMissingURL
@@ -56,6 +58,9 @@ func NewClient(cfg ClientConfig) (*RabbitClient, error) {
 	return client, nil
 }
 
+// connect устанавливает соединение с RabbitMQ согласно настройкам клиента.
+// Создаёт новое AMQP-соединение с конфигурацией таймаутов и heartbeat, заменяет
+// существующее соединение (если есть) и запускает горутину для мониторинга состояния.
 func (c *RabbitClient) connect() error {
 	dialer := &net.Dialer{
 		Timeout:   c.config.ConnectTimeout,
@@ -74,10 +79,12 @@ func (c *RabbitClient) connect() error {
 	}
 
 	c.mu.Lock()
+
 	oldConn := c.conn
 	c.conn = conn
 	c.notify = make(chan *amqp091.Error, 1)
 	conn.NotifyClose(c.notify)
+
 	c.mu.Unlock()
 
 	if oldConn != nil {
@@ -85,9 +92,13 @@ func (c *RabbitClient) connect() error {
 	}
 
 	go c.watchConnection()
+
 	return nil
 }
 
+// watchConnection отслеживает закрытие соединения с RabbitMQ.
+// При получении ошибки из канала (если клиент не закрыт явно)
+// запускает цикл переподключения.
 func (c *RabbitClient) watchConnection() {
 	select {
 	case <-c.ctx.Done():
@@ -99,8 +110,10 @@ func (c *RabbitClient) watchConnection() {
 	}
 }
 
+// reconnectLoop выполняет повторные попытки подключения к RabbitMQ с экспоненциальной задержкой.
+// Цикл продолжается до успешного подключения или явного закрытия клиента.
 func (c *RabbitClient) reconnectLoop() {
-	delay := c.config.ConsumeRetry.Delay
+	delay := c.config.ReconnectStrat.Delay
 	for attempt := 0; !c.closed.Load(); attempt++ {
 		if err := c.connect(); err == nil {
 			return
@@ -110,11 +123,12 @@ func (c *RabbitClient) reconnectLoop() {
 			return
 		case <-time.After(delay):
 		}
-		delay = time.Duration(float64(delay) * c.config.ConsumeRetry.Backoff)
+		delay = time.Duration(float64(delay) * c.config.ReconnectStrat.Backoff)
 	}
 }
 
-// GetChannel возвращает новый канал.
+// GetChannel возвращает новый AMQP-канал для работы с RabbitMQ.
+// Проверяет, что клиент не закрыт и соединение активно.
 func (c *RabbitClient) GetChannel() (*amqp091.Channel, error) {
 	if c.closed.Load() {
 		return nil, ErrClientClosed
@@ -131,7 +145,8 @@ func (c *RabbitClient) GetChannel() (*amqp091.Channel, error) {
 	return conn.Channel()
 }
 
-// Close закрываем соединение.
+// Close выполняет graceful shutdown клиента RabbitMQ:
+// Устанавливает флаг closed, отменяет контекст и закрывает AMQP-соединение.
 func (c *RabbitClient) Close() error {
 	if !c.closed.CompareAndSwap(false, true) {
 		return nil
@@ -140,15 +155,11 @@ func (c *RabbitClient) Close() error {
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	if c.conn != nil {
 		return c.conn.Close()
 	}
 	return nil
-}
-
-// Healthy проверяет, живо ли соединение.
-func (c *RabbitClient) Healthy() bool {
-	return !c.closed.Load() && c.conn != nil
 }
 
 // Context возвращает контекст клиента.
@@ -156,16 +167,9 @@ func (c *RabbitClient) Context() context.Context {
 	return c.ctx
 }
 
-func (c *RabbitClient) backoffWait(ctx context.Context, delay time.Duration) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	case <-time.After(delay):
-		return true
-	}
-}
-
-// DeclareExchange объявляет exchange.
+// DeclareExchange объявляет exchange в RabbitMQ.
+// Создаёт временный канал, объявляет exchange с указанными
+// параметрами и закрывает канал после использования.
 func (c *RabbitClient) DeclareExchange(name, kind string, durable, autoDelete,
 	internal bool, args amqp091.Table) error {
 	ch, err := c.GetChannel()
@@ -179,7 +183,7 @@ func (c *RabbitClient) DeclareExchange(name, kind string, durable, autoDelete,
 	return ch.ExchangeDeclare(name, kind, durable, autoDelete, internal, false, args)
 }
 
-// DeclareQueue объявляет очередь и привязывает её к exchange.
+// DeclareQueue объявляет очередь и настраивает её связь с обменником.
 func (c *RabbitClient) DeclareQueue(
 	queueName, exchangeName, routingKey string,
 	queueDurable, queueAutoDelete bool,
@@ -193,13 +197,6 @@ func (c *RabbitClient) DeclareQueue(
 	defer func(ch *amqp091.Channel) {
 		_ = ch.Close()
 	}(ch)
-
-	// Объявляем exchange (idempotent)
-	if err := ch.ExchangeDeclare(
-		exchangeName, "direct", exchangeDurable, false, false, false, nil,
-	); err != nil {
-		return err
-	}
 
 	// Объявляем очередь
 	_, err = ch.QueueDeclare(

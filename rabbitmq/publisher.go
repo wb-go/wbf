@@ -23,19 +23,21 @@ func NewPublisher(client *RabbitClient, exchange, contentType string) *Publisher
 	}
 }
 
-// GetExchangeName - Получение названия Exchang.
+// GetExchangeName возвращает имя обменника, который использует publisher.
 func (p *Publisher) GetExchangeName() string {
 	return p.exchange
 }
 
-// Publish - отправка сообщения в обменник.
+// Publish отправляет сообщение в указанный exchange с заданным routing key.
+// Использует стратегию повторных попыток (ProducingStrat) при ошибках.
+// Автоматически управляет временными каналами и применяет дополнительные опции публикации.
 func (p *Publisher) Publish(
 	ctx context.Context,
 	body []byte,
 	routingKey string,
 	opts ...PublishOption,
 ) error {
-	return retry.DoContext(ctx, p.client.config.PublishRetry, func() error {
+	return retry.DoContext(ctx, p.client.config.ProducingStrat, func() error {
 		ch, err := p.client.GetChannel()
 		if err != nil {
 			return err

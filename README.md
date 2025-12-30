@@ -1,32 +1,61 @@
-## WBF
+![wbf banner](assets/banner.png)
 
-WBF — это внутренний инфраструктурный фреймворк, минималистичный набор обёрток для работы с основными инфраструктурными сервисами в Go. Он поможет быстро и просто подключить к проекту такие штуки, как PostgreSQL, Redis, Kafka, логирование (через zerolog), конфиги (через viper), повторные попытки (retry) и удобную работу с горутинами и каналами.
+<h3 align="center">Минималистичный фреймворк для работы с базовыми инфраструктурными штуками.</h3> 
 
-Что внутри?
-    * dbpg — работа с PostgreSQL (разделение на чтение/запись, пул соединений, батчи, автоматический retry)
-    * redis — работа с Redis (поддержка батчей и retry)
-    * kafka — Kafka (producer/consumer, автоматические retry, асинхронное потребление)
-    * zlog — логирование на базе zerolog (по умолчанию в формате JSON)
-    * config — загрузка конфигов через viper
-    * retry — универсальный механизм повторных попыток для любых операций
-    * ginext — обёртка для Gin (web-фреймворк)
+<h1></h1>
 
-### Как быстро начать?
+<br>
+
+WBF — это готовый набор обёрток для стандартной инфраструктуры. С его помощью можно быстро интегрировать в проект базу данных (PostgreSQL), кэширование (Redis), брокера сообщений (Kafka/RabbitMQ), систему логирования (Zerolog) и загрузчик конфигураций (Viper).
+
+<br>
+
+## Пакеты:
+
+* [dbpg](/dbpg/dbpg.go) — пакет для работы с PostgreSQL, реализующий архитектуру «мастер-реплика» с балансировкой нагрузки на чтение, пулом соединений и встроенной поддержкой повторных попыток. 
+
+* [redis](/redis/redis.go) — пакет-обёртка над go-redis со встроенной поддержкой повторных попыток, асинхронным батчевым выполнением операций записи и упрощённым API.
+
+* [kafka](/kafka/kafka.go) — пакет для работы с Apache Kafka, предоставляющий готовых продюсера и консьюмера с автоматическими повторами и асинхронной обработкой сообщений.
+
+* [rabbitmq](/rabbitmq/client.go) — пакет для работы с RabbitMQ, предоставляющий готовые клиенты для публикации и обработки сообщений с автоматическим переподключением, настраиваемыми стратегиями повторных попыток и поддержкой многопоточной обработки.
+
+* [zlog](/zlog/zlog.go) — пакет для структурированного логирования на базе zerolog, предоставляющий готовый глобальный логгер с настройкой формата вывода (JSON или консоль), уровнями логирования и автоматическим добавлением временных меток.
+    
+* [config](/config/config.go) — пакет для работы с конфигурацией, реализующий загрузку настроек из различных источников через Viper, включая .env файлы, YAML/JSON конфиги, переменные окружения и командные флаги.
+    
+* [retry](/retry/retry.go) — пакет для реализации повторных попыток выполнения операций, предоставляющий настраиваемые стратегии с экспоненциальным бэк-оффом, поддержкой контекста для graceful shutdown и универсальным интерфейсом для любых функций.
+
+* [ginext](/ginext/ginext.go) — пакет-обёртка для веб-фреймворка Gin с полной поддержкой всех HTTP-методов, middleware и удобной настройкой режимов работы.
+
+* [helpers](/helpers) — пакет для мелких вспомогательных функций общего назначения.
+
+<br>
 
 
-#### PostgreSQL
+## Примеры использования
+
+### PostgreSQL
+
+Инициализация подключения с настройками пула соединений:
 ```go
-opts := &dbpg.Options{MaxOpenConns: 10, MaxIdleConns: 5}
+opts := &dbpg.Options{MaxOpenConns: 10, MaxIdleConns: 5} 
 db, err := dbpg.New(masterDSN, slaveDSNs, opts)
 ```
 
-С автоматическим повтором запросов (через пакет retry):
+<br>
+
+Запрос с автоматическим повторением при ошибках (через пакет retry):
 ```go
-res, err := db.ExecWithRetry(ctx, retry.Strategy{Attempts: 3, Delay: time.Second, Backoff: 2}, "UPDATE ...")
+query := "UPDATE..."
+strategy := retry.Strategy{Attempts: 3, Delay: 5 * time.Second, Backoff: 2}
+
+res, err := db.ExecWithRetry(ctx, strategy, query)
 ```
 
-Пакетная запись через канал:
+<br>
 
+Пакетная запись через канал:
 ```go
 ch := make(chan string)
 go db.BatchExec(ctx, ch)
@@ -34,8 +63,9 @@ ch <- "INSERT ..."
 close(ch)
 ```
 
-Транзакции WithTx:
+<br>
 
+Транзакция с автоматическим rollback/commit:
 ```go
 err := db.WithTx(ctx, func(tx *sql.Tx) error {
     tx.ExecContext(ctx, "INSERT ...")
@@ -44,11 +74,48 @@ err := db.WithTx(ctx, func(tx *sql.Tx) error {
 })
 ```
 
-#### Redis
+<br>
+
+### Redis
+
+Подключение и чтение с ретраями:
 ```go
 client := redis.New("localhost:6379", "", 0)
-val, err := client.GetWithRetry(ctx, retry.Strategy{Attempts: 3, Delay: time.Second, Backoff: 2}, "key")
+strategy := retry.Strategy{Attempts: 3, Delay: 5 * time.Second, Backoff: 2}
+
+val, err := client.GetWithRetry(ctx, strategy, "key")
 ```
+
+<br>
+
+
+Подключение с конфигурацией памяти:
+```go
+options := redis.Options{
+    Address:   "localhost:6379",
+    Password:  "",                    
+    MaxMemory: "100mb",               
+    Policy:    "allkeys-lru",        
+}
+
+client, err := redis.Connect(options)
+```
+
+<br>
+
+Запись с TTL и ретраями:
+```go
+strategy := retry.Strategy{Attempts: 3, Delay: 2 * time.Second, Backoff: 2}
+key := "abobaUUID"
+value := "pending"
+expiration := time.Hour
+
+if err := client.SetWithExpirationAndRetry(ctx, strategy, key, value, expiration); err != nil {
+    return err
+}
+```
+
+<br>
 
 Пакетная запись через канал:
 ```go
@@ -58,62 +125,71 @@ ch <- [2]string{"key", "value"}
 close(ch)
 ```
 
+<br>
 
-#### Kafka
+### Kafka
+
+Producer — отправка сообщений с автоматическим повторением при ошибках:
 ```go
-// Producer
 producer := kafka.NewProducer([]string{"localhost:9092"}, "topic")
-err := producer.SendWithRetry(ctx, retry.Strategy{Attempts: 3, Delay: time.Second, Backoff: 2}, []byte("key"), []byte("value"))
+strategy := retry.Strategy{Attempts: 3, Delay: 5 * time.Second, Backoff: 2}
+
+err := producer.SendWithRetry(ctx, strategy, []byte("key"), []byte("value"))
 ```
 
+<br>
+
+Consumer — асинхронная обработка сообщений с повторами:
 ```go
-// Consumer
-consumer := kafka.NewConsumer([]string{"localhost:9092"}, "topic", "group")
 msgCh := make(chan kafka.Message)
-consumer.StartConsuming(ctx, msgCh, retry.Strategy{Attempts: 3, Delay: time.Second, Backoff: 2})
+consumer := kafka.NewConsumer([]string{"localhost:9092"}, "topic", "group")
+strategy := retry.Strategy{Attempts: 3, Delay: 5 * time.Second, Backoff: 2}
+
+consumer.StartConsuming(ctx, msgCh, strategy)
+
 for msg := range msgCh {
     // обработка сообщения
 }
 ```
 
-#### Логирование
+<br>
+
+Логирование:
 ```go
 zlog.Init()
 zlog.Logger.Info().Msg("Hello")
 ```
 
-#### Конфиги
+<br>
+
+Конфиги:
 ```go
 cfg := config.New()
 _ = cfg.Load("config.yaml")
 val := cfg.GetString("some.key")
 ```
 
-#### Повторные попытки (retry)
-```go
-err := retry.Do(func() error {
-    // ваш код
-    return nil
-}, retry.Strategy{Attempts: 3, Delay: time.Second, Backoff: 2})
-```
-а так же
+<br>
 
+Повторные попытки (retry):
 ```go
 ctx := context.Background()
-err := retry.DoContext(ctx, retry.Strategy{Attempts: 3, Delay: time.Second, Backoff: 2},
-    func() error {
-	//ваш код
-	retrun nil
-})
+strategy := retry.Strategy{Attempts: 3, Delay: 5 * time.Second, Backoff: 2}
+
+err := retry.Do(func() error { return nil }, strategy)
+err := retry.DoContext(ctx, strategy, func() error { retrun nil })
 ```
 
+<br>
 
 ### rabbitmq
 
-Описание и документация [rabbitmq_doc.md](docs/rabbitmq_doc.md)
+Описание и документация: [rabbitmq_doc.md](docs/rabbitmq_doc.md)
+
+<br>
 
 ## TODO
-  * Написать тесты
+  * Написать тесты (like that's ever gonna happen)
   * Добавить больше примеров использования
   * Сделать middleware и метрики
 
