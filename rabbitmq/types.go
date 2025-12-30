@@ -12,12 +12,13 @@ import (
 
 // ClientConfig — конфигурация клиента RabbitMQ.
 type ClientConfig struct {
-	URL            string
-	ConnectionName string // для идентификации в RabbitMQ UI
-	ConnectTimeout time.Duration
-	Heartbeat      time.Duration
-	PublishRetry   retry.Strategy
-	ConsumeRetry   retry.Strategy
+	URL            string         // Адрес RabbitMQ сервера (обязателен)
+	ConnectionName string         // Имя для отображения в RabbitMQ Management
+	ConnectTimeout time.Duration  // Таймаут установки TCP соединения
+	Heartbeat      time.Duration  // Интервал heartbeat для поддержания соединения
+	ReconnectStrat retry.Strategy // Стратегия повторных попыток при разрыве соединения
+	ProducingStrat retry.Strategy // Стратегия повторных попыток для публикации сообщений
+	ConsumingStrat retry.Strategy // Стратегия повторных попыток для обработки сообщений
 }
 
 // PublishOption — функциональная опция для публикации.

@@ -3,11 +3,15 @@ package rabbitmq
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
+	"time"
 
 	"github.com/rabbitmq/amqp091-go"
-	"github.com/wb-go/wbf/zlog"
+	"github.com/wb-go/wbf/retry"
 )
+
+const maxDelay = 1 * time.Hour
 
 // Consumer - обертка над RabbitMQ-клиентом для получения сообщений из обменника.
 type Consumer struct {
@@ -31,30 +35,70 @@ func NewConsumer(client *RabbitClient, cfg ConsumerConfig, handler MessageHandle
 	}
 }
 
-// Start запуск чтения сообщений.
+// Start запускает консьюмера. При разрыве соединения автоматически
+// восстанавливает подключение с возрастающими задержками между попытками.
 func (c *Consumer) Start(ctx context.Context) error {
-	zlog.Logger.Info().Msgf("Starting consumer %s", c.config.ConsumerTag)
-	for {
-		err := c.consumeOnce(ctx)
-		if err == nil {
-			return nil
-		}
+	currentDelay := c.client.config.ReconnectStrat.Delay
 
+	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		case <-c.client.Context().Done():
 			return ErrClientClosed
 		default:
 		}
 
-		if !c.client.backoffWait(ctx, c.client.config.ConsumeRetry.Delay) {
-			return nil
+		if !c.client.Healthy() {
+			c.backoffWait(ctx, c.client.config.ReconnectStrat, &currentDelay)
+			continue
 		}
+
+		currentDelay = c.client.config.ReconnectStrat.Delay
+
+		if err := c.consume(ctx); err != nil {
+			continue
+		}
+
+		return nil
 	}
 }
 
-func (c *Consumer) consumeOnce(ctx context.Context) error {
+// Healthy проверяет состояние клиента RabbitMQ.
+// Клиент считается здоровым, если не закрыт явно и имеет активное AMQP-соединение.
+func (c *RabbitClient) Healthy() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return !c.closed.Load() && c.conn != nil && !c.conn.IsClosed()
+}
+
+// backoffWait ждёт currentDelay секунд, экспоненциально увеличивая задержку при каждом вызове.
+// Прерывается при отмене основного контекста или при закрытии клиента RabbitMQ.
+func (c *Consumer) backoffWait(ctx context.Context, strategy retry.Strategy, currentDelay *time.Duration) {
+	timer := time.NewTimer(*currentDelay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		if !timer.Stop() {
+			<-timer.C
+		}
+		return
+	case <-c.client.Context().Done():
+		if !timer.Stop() {
+			<-timer.C
+		}
+		return
+	case <-timer.C:
+		newDelay := min(time.Duration(float64(*currentDelay)*strategy.Backoff), maxDelay)
+		*currentDelay = newDelay
+		return
+	}
+}
+
+// consume подключается к очереди и стартует воркеров для обработки сообщений.
+// Работает до отмены контекста, закрытия клиента или обрыва связи с брокером.
+func (c *Consumer) consume(ctx context.Context) error {
 	ch, err := c.client.GetChannel()
 	if err != nil {
 		return fmt.Errorf("failed to get channel: %w", err)
@@ -65,7 +109,8 @@ func (c *Consumer) consumeOnce(ctx context.Context) error {
 
 	if c.config.PrefetchCount > 0 {
 		if err := ch.Qos(c.config.PrefetchCount, 0, false); err != nil {
-			return fmt.Errorf("failed to set QoS: %w", err)
+			return fmt.Errorf("failed to set prefetch count to %d: %w",
+				c.config.PrefetchCount, err)
 		}
 	}
 
@@ -79,7 +124,8 @@ func (c *Consumer) consumeOnce(ctx context.Context) error {
 		c.config.Args,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to consume: %w", err)
+		return fmt.Errorf("failed to start consumer %q on queue %q: %w",
+			c.config.ConsumerTag, c.config.Queue, err)
 	}
 
 	workerCtx, cancel := context.WithCancel(ctx)
@@ -103,32 +149,14 @@ func (c *Consumer) consumeOnce(ctx context.Context) error {
 		cancel()
 		wg.Wait()
 		return ErrClientClosed
+	default:
+		wg.Wait()
+		return ErrWorkersTerminated
 	}
 }
 
-func (c *Consumer) processDelivery(ctx context.Context, msg amqp091.Delivery) {
-	if c.config.AutoAck {
-		if err := c.handler(ctx, msg); err != nil {
-			zlog.Logger.Warn().
-				Err(err).
-				Str("consumer", c.config.ConsumerTag).
-				Msg("AutoAck handler failed")
-		}
-		return
-	}
-
-	// Режим ручного подтверждения
-	if err := c.handler(ctx, msg); err != nil {
-		if nackErr := msg.Nack(c.config.Nack.Multiple, c.config.Nack.Requeue); nackErr != nil {
-			zlog.Logger.Error().Err(nackErr).Msg("NACK failed")
-		}
-	} else {
-		if ackErr := msg.Ack(c.config.Ask.Multiple); ackErr != nil {
-			zlog.Logger.Error().Err(ackErr).Msg("ACK failed")
-		}
-	}
-}
-
+// worker читает сообщения из канала msgs и передаёт их на обработку в processDelivery.
+// Завершается при закрытии канала msgs (потеря соединения) или отмене контекста.
 func (c *Consumer) worker(ctx context.Context, msgs <-chan amqp091.Delivery) {
 	for {
 		select {
@@ -139,6 +167,28 @@ func (c *Consumer) worker(ctx context.Context, msgs <-chan amqp091.Delivery) {
 				return
 			}
 			c.processDelivery(ctx, msg)
+		}
+	}
+}
+
+// processDelivery обрабатывает одно сообщение в соответствии с настройками консьюмера.
+func (c *Consumer) processDelivery(ctx context.Context, msg amqp091.Delivery) {
+	if c.config.AutoAck {
+		if err := retry.DoContext(ctx, c.client.config.ConsumingStrat,
+			func() error { return c.handler(ctx, msg) }); err != nil {
+			log.Printf("WARN: AutoAck handler failed for consumer %q: %v", c.config.ConsumerTag, err)
+		}
+		return
+	}
+
+	if err := retry.DoContext(ctx, c.client.config.ConsumingStrat,
+		func() error { return c.handler(ctx, msg) }); err != nil {
+		if nackErr := msg.Nack(c.config.Nack.Multiple, c.config.Nack.Requeue); nackErr != nil {
+			log.Printf("ERROR: Failed to send NACK: %v", nackErr)
+		}
+	} else {
+		if ackErr := msg.Ack(c.config.Ask.Multiple); ackErr != nil {
+			log.Printf("ERROR: Failed to send ACK: %v", ackErr)
 		}
 	}
 }

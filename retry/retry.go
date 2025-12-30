@@ -29,7 +29,7 @@ func Do(fn func() error, strategy Strategy) error {
 }
 
 // DoContext выполняет функцию с заданной стратегией повторных попыток
-// только с контекстом и завершением при gracefully shutdown.
+// только с контекстом и завершением при graceful shutdown.
 func DoContext(ctx context.Context, strategy Strategy, fn func() error) error {
 	delay := strategy.Delay
 	var err error
