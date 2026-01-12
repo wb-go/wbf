@@ -14,6 +14,7 @@ func newZerologLogger(appName, env string, cfg *GlobalConfig) zerolog.Logger {
 		Timestamp().
 		Str("service", appName).
 		Str("env", env).
+		Caller().
 		Logger()
 }
 
