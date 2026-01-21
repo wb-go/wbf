@@ -178,6 +178,11 @@ func Time(key string, value time.Time) Attr {
 	return Attr{Key: key, Value: value}
 }
 
+// Duration creates a time.Duration attribute for structured logging.
+func Duration(key string, value time.Duration) Attr {
+	return Attr{Key: key, Value: value}
+}
+
 // Any creates an attribute with an arbitrary value for structured logging.
 func Any(key string, value any) Attr {
 	return Attr{Key: key, Value: value}
